@@ -1024,7 +1024,8 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
 
             <div class="btn-group step-nav">
                 <button type="button" class="secondary" onclick="editProfile()">← Edit inputs</button>
-                <button type="button" class="save-btn" onclick="saveProfileAndResults()">💾 Save plan</button>
+                <button type="button" class="save-btn" onclick="saveProfileAndResults()">💾 Save on this device</button>
+                <button type="button" class="save-btn" onclick="saveToBoth()">☁ Save on device and cloud</button>
             </div>
         </div>
 
@@ -3206,6 +3207,18 @@ The numbers in that example are placeholders from a prior year — replace every
         putAllProfiles(all);
         showSaveBadge('Profile & results saved!');
         updateSaveStatus();
+    }
+
+    // Saves on this device, then pushes the same scenario to the cloud (asks for the passphrase first if locked).
+    function saveToBoth() {
+        saveProfileAndResults();
+        const cur = getAllProfiles()[justSavedId];
+        if (!cur || !window.awrSyncPlan) { showSaveBadge('Saved on this device. Cloud saving is not available here'); return; }
+        window.awrSyncPlan(cur).then(function (r) {
+            if (r === 'ok') showSaveBadge('Saved on this device and in the cloud');
+            else if (r === 'fail') showSaveBadge('Saved on this device. Could not reach the cloud, try Sync to cloud later');
+            /* locked: the passphrase panel opened; the device copy is already saved */
+        });
     }
 
     // After a calculation the results on screen are new, so refresh the ones stored with the profile.
