@@ -41,6 +41,7 @@
             only65: 'The planner asks for the age-65 amount and adjusts for your start age itself, so only age 65 can be applied from this table.',
             willSet: 'Will set “QPP per month at 65” (yours)',
             willSetSp: 'Will set “Spouse QPP per month at 65”',
+            willSetFor: 'Will set the QPP per month at 65 for {n}',
             now: 'now', apply: 'Apply', applied: 'Applied. Review it in step 2, then calculate.',
             pickTitle: 'Not right? Pick the number yourself',
             pickHelp: 'Every dollar amount found in the PDF, with the words next to it. Tap the one that is the monthly pension at age 65.',
@@ -76,6 +77,7 @@
             only65: 'Le planificateur demande le montant à 65 ans et ajuste lui-même selon votre âge de début; seul le montant à 65 ans peut donc être appliqué depuis ce tableau.',
             willSet: 'Remplira « RRQ mensuelle à 65 ans » (la vôtre)',
             willSetSp: 'Remplira « RRQ mensuelle du/de la conjoint(e) à 65 ans »',
+            willSetFor: 'Remplira la RRQ mensuelle à 65 ans de {n}',
             now: 'actuel', apply: 'Appliquer', applied: 'Appliqué. Vérifiez à l’étape 2, puis calculez.',
             pickTitle: 'Ce n’est pas ça? Choisissez le montant vous-même',
             pickHelp: 'Tous les montants en dollars trouvés dans le PDF, avec les mots à côté. Touchez celui qui est la rente mensuelle à 65 ans.',
@@ -323,7 +325,19 @@
         var s = (Math.round(v * 100) / 100).toLocaleString(isFr() ? 'fr-CA' : 'en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         return isFr() ? s + ' $' : '$' + s;
     }
-    function targetId(forWho) { return forWho === 'spouse' ? 'spouseQppMonthlyAmt' : 'qppMonthlyAmt'; }
+    function targetId(forWho) { return (forWho === 'spouse' && !hhOn()) ? 'spouseQppMonthlyAmt' : 'qppMonthlyAmt'; }
+    // couple (household) mode: each person has their own form; a statement can be filed for the person on screen or for the other one
+    function hhOn() { return isCouple() && typeof HH !== 'undefined' && !!HH; }
+    function openWho() { return (hhOn() && HH.who === 'spouse') ? 'spouse' : 'me'; }
+    function whoName(w) { try { if (typeof hhLabel === 'function') return hhLabel(w === 'spouse' ? 'sp' : 'me'); } catch (e) { /* ignore */ } return w === 'spouse' ? t('spouse') : t('me'); }
+    function storedOnly(w) { return hhOn() && w !== openWho(); }   // the chosen person's form is not the one on screen
+    function storedProfile(w) { if (w === 'spouse' && !HH.spouse && typeof hhEnsureSpouse === 'function') hhEnsureSpouse(); return w === 'spouse' ? HH.spouse : HH.me; }
+    function whoBlock() {
+        if (!hhOn()) return '';
+        var w = (state && state.forWho) || openWho();
+        function row(v) { return '<label class="ai-row"><input type="radio" name="stmtWho" value="' + v + '"' + (w === v ? ' checked' : '') + ' style="width:auto;margin:0 0.5rem 0 0"><span class="ai-lbl">' + esc(whoName(v)) + '</span></label>'; }
+        return '<div id="stmtWho" style="margin:0.5rem 0"><div style="font-weight:600">' + esc(t('forWho')) + '</div>' + row('me') + row('spouse') + '</div>';
+    }
     function isCouple() { var m = document.getElementById('calcMode'); return !!m && m.value === 'couple'; }
     function alreadyRetired() { var r = document.getElementById('alreadyRetired'); return !!(r && r.checked); }
 
@@ -335,9 +349,6 @@
         var h = '<p style="margin:0 0 0.5rem;font-size:0.85rem;color:var(--medium-gray)">' + esc(t('intro')) + '</p>' +
             '<label for="stmtFile" style="font-weight:600">' + esc(t('file')) + '</label>' +
             '<div id="stmtFileSlot"></div>' +
-            '<div id="stmtWho" style="margin:0.5rem 0"><span style="font-weight:600">' + esc(t('forWho')) + ' </span>' +
-            '<label style="font-weight:400;margin-right:0.8rem"><input type="radio" name="stmtWho" value="me" checked> ' + esc(t('me')) + '</label>' +
-            '<label style="font-weight:400"><input type="radio" name="stmtWho" value="spouse"> ' + esc(t('spouse')) + '</label></div>' +
             '<div id="stmtOut" aria-live="polite"></div>' +
             '<p style="margin:0.6rem 0 0;font-size:0.76rem">' + esc(t('privacy')) + '</p>';
         body.innerHTML = h;
@@ -348,11 +359,6 @@
             inp.type = 'file'; inp.id = 'stmtFile'; inp.accept = '.pdf,application/pdf';
             inp.addEventListener('change', onFile);
             slot.appendChild(inp);
-        }
-        var radios = body.querySelectorAll('input[name=stmtWho]');
-        for (var i = 0; i < radios.length; i++) {
-            radios[i].checked = (radios[i].value === ((state && state.forWho) || 'me'));
-            radios[i].addEventListener('change', function () { if (state) state.forWho = this.value; renderResult(); });
         }
         renderResult();
     }
@@ -387,7 +393,9 @@
         }
         h += pubBlock();
         h += pickList();
-        out.innerHTML = h;
+        out.innerHTML = whoBlock() + h;
+        var radios = out.querySelectorAll('input[name=stmtWho]');
+        for (var ri2 = 0; ri2 < radios.length; ri2++) radios[ri2].addEventListener('change', function () { if (state) state.forWho = this.value; renderResult(); });
         wire(out);
     }
 
@@ -406,12 +414,21 @@
             });
         });
         h += '</div>';
-        if (((state && state.forWho) || 'me') === 'spouse') return h + msg('bad', t('pubSpouse'));
+        if (!hhOn() && ((state && state.forWho) || 'me') === 'spouse') return h + msg('bad', t('pubSpouse'));
         return h + msg('', t('pubWill')) + msg('note', t('pubIdx')) +
             '<div class="btn-row"><button type="button" class="save-btn" id="stmtApplyPub">' + esc(t('apply')) + '</button></div>';
     }
 
     function applyPublic(v, age) {
+        var who2 = (state && state.forWho) || 'me', other = hhOn() && storedOnly(who2);
+        if (other) {
+            var sp2 = storedProfile(who2); if (!sp2) return false;
+            sp2.ownPensionAnnual = Math.round(v); if (age) sp2.ownPensionStartAge = age;
+            if (!sp2.pensionType || sp2.pensionType === 'none') sp2.pensionType = 'db'; else if (sp2.pensionType === 'dc') sp2.pensionType = 'both';
+            var out0 = document.getElementById('stmtOut');
+            if (out0) out0.insertAdjacentHTML('afterbegin', msg('good', t('applied') + ' ' + fmt(v) + ' ' + t('pubYear')));
+            return true;
+        }
         function put(id, val) {
             var el = document.getElementById(id); if (!el) return false;
             el.value = String(val);
@@ -435,9 +452,10 @@
     function applyBlock() {
         var who = (state && state.forWho) || 'me';
         if (who === 'spouse' && !isCouple()) return msg('bad', t('needSpouse'));
-        var el = document.getElementById(targetId(who));
-        var cur = el ? parseFloat(el.value) : NaN;
-        return '<div class="ai-msg">' + esc(who === 'spouse' ? t('willSetSp') : t('willSet')) + (isFinite(cur) ? ' (' + esc(t('now')) + ' ' + esc(fmt(cur)) + ')' : '') + '</div>' +
+        var cur;
+        if (hhOn() && storedOnly(who)) { var sp0 = storedProfile(who); cur = sp0 ? parseFloat(sp0.qppMonthlyAmt) : NaN; }
+        else { var el = document.getElementById(targetId(who)); cur = el ? parseFloat(el.value) : NaN; }
+        return '<div class="ai-msg">' + esc(hhOn() ? t('willSetFor').replace('{n}', whoName(who)) : (who === 'spouse' ? t('willSetSp') : t('willSet'))) + (isFinite(cur) ? ' (' + esc(t('now')) + ' ' + esc(fmt(cur)) + ')' : '') + '</div>' +
             '<div class="btn-row"><button type="button" class="save-btn" id="stmtApply">' + esc(t('apply')) + '</button></div>';
     }
 
@@ -456,11 +474,16 @@
     function setValue(v) {
         var who = (state && state.forWho) || 'me';
         if (who === 'spouse' && !isCouple()) { var o = document.getElementById('stmtOut'); if (o) o.insertAdjacentHTML('afterbegin', msg('bad', t('needSpouse'))); return false; }
-        var el = document.getElementById(targetId(who));
-        if (!el) return false;
-        el.value = String(v);
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        if (hhOn() && storedOnly(who)) {
+            var sp1 = storedProfile(who); if (!sp1) return false;
+            sp1.qppMonthlyAmt = v;   // the other person's saved form; they see it when you switch to them
+        } else {
+            var el = document.getElementById(targetId(who));
+            if (!el) return false;
+            el.value = String(v);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         if (typeof window.refreshCollapsibleSummaries === 'function') { try { window.refreshCollapsibleSummaries(); } catch (e) { /* ignore */ } }
         if (typeof window.showSaveBadge === 'function') { try { window.showSaveBadge('✓ ' + t('applied')); } catch (e) { /* ignore */ } }
         var out = document.getElementById('stmtOut');
@@ -489,8 +512,7 @@
         var f = ev.target.files && ev.target.files[0];
         var out = document.getElementById('stmtOut');
         if (!f) return;
-        var who = (document.querySelector('input[name=stmtWho]:checked') || {}).value || 'me';
-        state = { forWho: who };
+        state = { forWho: hhOn() ? openWho() : 'me' };
         if (!(/\.pdf$/i.test(f.name) || f.type === 'application/pdf')) { state.error = 'notPdf'; renderResult(); return; }
         if (out) out.innerHTML = msg('', t('reading'));
         var rd = new FileReader();
