@@ -74,6 +74,28 @@ with sync_playwright() as pw:
     exp = pg.evaluate("[HH.expShare, HH.prof.me.spendAmount + HH.prof.sp.spendAmount, HH.me.spendAmount]")
     check(exp[0] is not None and abs(exp[1] - exp[2]) < 0.05, 'expense-driven split adds up: %s' % exp)
     check(pg.evaluate("document.getElementById('hhSplitIn').disabled"), 'manual split disabled when the expense list sets it')
+    # life events: who pays
+    pg.evaluate("hhSwitch('me'); showStep(7)")
+    check(pg.evaluate("document.getElementById('event1Pct').closest('.hh-evpct').hidden") is False, 'event share box shows for a couple')
+    pg.evaluate("""() => { const me = HH.me; document.getElementById('event1Name').value = 'Wedding'; document.getElementById('event1Amount').value = 10000;
+        document.getElementById('event1Age').value = 70; document.getElementById('event1Pct').value = 60;
+        document.getElementById('event2Name').value = 'Roof'; document.getElementById('event2Amount').value = 8000; document.getElementById('event2Age').value = 71;
+        document.getElementById('recur1Name').value = 'Condo'; document.getElementById('recur1Amount').value = 2000; document.getElementById('recur1StartAge').value = 66; document.getElementById('recur1EndAge').value = 68; document.getElementById('recur1Pct').value = 25; }""")
+    pg.evaluate("calculateRetirementPlan('house')")
+    ev = pg.evaluate("""() => { const d = HH.spouse.currentAge - HH.me.currentAge; return { d: d, me: HH.prof.me.events.map(e => [e.name, e.amount, e.age]), sp: HH.prof.sp.events.map(e => [e.name, e.amount, e.age]),
+        rme: HH.prof.me.recurringEvents.map(e => [e.amount, e.startAge, e.endAge]), rsp: HH.prof.sp.recurringEvents.map(e => [e.amount, e.startAge, e.endAge]) }; }""")
+    d = ev['d']
+    check(['Wedding', 6000, 70] in ev['me'] and ['Wedding', 4000, 70 + d] in ev['sp'], 'one-time event split 60/40 with the spouse age shifted: %s' % ev)
+    check(['Roof', 8000, 71] in ev['me'] and not any(e[0] == 'Roof' for e in ev['sp']), 'blank share means the filler pays all')
+    check([500, 66, 68] in ev['rme'] and [1500, 66 + d, 68 + d] in ev['rsp'], 'recurring event split 25/75: %s' % ev)
+    pg.evaluate("hhSwitch('spouse')")
+    pg.evaluate("document.getElementById('event1Name').value = 'Car'; document.getElementById('event1Amount').value = 3000; document.getElementById('event1Age').value = 55; document.getElementById('event1Pct').value = 50")
+    pg.evaluate("calculateRetirementPlan('house')")
+    car = pg.evaluate("[HH.prof.me.events.filter(e => e.name === 'Car').map(e => [e.amount, e.age]), HH.prof.sp.events.filter(e => e.name === 'Car').map(e => [e.amount, e.age])]")
+    check(car[1] == [[1500, 55]] and car[0] == [[1500, 55 - d]], 'an event entered in the spouse form splits too: %s' % car)
+    p3 = pg.evaluate("getProfileData()"); pg.evaluate("p => populateForm(p)", p3)
+    check(pg.evaluate("document.getElementById('event1Pct').value") == '60', 'my event share survives a saved profile')
+    pg.evaluate("hhSwitch('me'); calculateRetirementPlan('house')")
     # older joint profiles become a spouse form
     pg.evaluate("populateForm({calcMode:'couple', currentAge:60, targetAge:65, spouseAge:58, spouseRetirementAge:63, spendAmount:5000, spendFrequency:'monthly', spouseTfsa:30000})")
     check(pg.evaluate("HH.spouse.currentAge") == 58 and pg.evaluate("HH.spouse.currentTfsa") == 30000 and pg.evaluate("HH.legacy") != '', 'legacy joint profile migrates')
