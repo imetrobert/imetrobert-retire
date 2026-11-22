@@ -1935,8 +1935,9 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             </div>
 
 
-            <div class="btn-group" style="justify-content: flex-end;">
-                <button type="button" class="secondary" onclick="showStep(1)">Back to Form</button>
+            <div class="btn-group step-nav" id="evBar">
+                <button type="button" class="secondary" onclick="evCancel()">Cancel</button>
+                <button type="button" class="save-btn" onclick="evSave()">Save for this scenario</button>
             </div>
         </div>
     </div>
@@ -2735,7 +2736,26 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('progressFill').style.width = `${progress}%`;
     }
 
+    // Life events screen: Save keeps the changes, Cancel puts back what was there when the screen was opened.
+    let evReturn = 1, evSnap = null;
+    function evFields() { return document.querySelectorAll('.question-step[data-step="7"] input, .question-step[data-step="7"] select'); }
+    function evOpen() {
+        const a = document.querySelector('.question-step.active'), from = a ? a.getAttribute('data-step') : '1';
+        if (from === '7') return;
+        evReturn = parseInt(from, 10) || 1; if (evReturn === 7) evReturn = 1;
+        evSnap = {}; evFields().forEach(el => { if (el.id) evSnap[el.id] = el.value; });
+    }
+    function evSave() {
+        try { saveProfileProgress(); showSaveBadge('Saved for this scenario'); } catch (e) { /* ignore */ }
+        evSnap = null; showStep(evReturn);
+    }
+    function evCancel() {
+        if (evSnap) evFields().forEach(el => { if (el.id && el.id in evSnap && el.value !== evSnap[el.id]) { el.value = evSnap[el.id]; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } });
+        evSnap = null; showStep(evReturn);
+    }
+
     function showStep(step) {
+        if (step === 7) evOpen();
         document.querySelectorAll('.question-step').forEach(el => el.classList.remove('active'));
         const target = document.querySelector(`.question-step[data-step="${step}"]`);
         if (target) {
@@ -5947,7 +5967,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '#expSheet{position:fixed;inset:0;z-index:9998;display:none}#expSheet.open{display:block}#expSheet .bd{position:absolute;inset:0;background:rgba(15,23,42,.5)}'
             + '#expSheet .sh{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25)}'
             + '#expSheet h3{margin:0 0 8px}#expSheet .exp-note{display:block;font-size:13px;line-height:1.45;color:#475569;margin:0 0 8px}'
-            + '#expSheet .exp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}#expSheet .exp-row .ef{flex:0 0 118px;margin:0;min-width:0;width:auto}#expSheet .exp-row input{margin:0;min-width:0;width:auto}#expSheet .exp-row .en{flex:1 1 100%}#expSheet .exp-row .ea{flex:1 1 110px;min-width:0}#expSheet .exp-row .eaw{position:relative;flex:1 1 110px;min-width:0;display:block}#expSheet .exp-row .eaw::before{content:"$";position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.65;pointer-events:none}#expSheet .exp-row .eaw .ea{width:100%;box-sizing:border-box;padding-left:28px}'
+            + '#expSheet .exp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}#expSheet .exp-row .ef{flex:0 0 118px;margin:0;min-width:0;width:auto}#expSheet .exp-row input{margin:0;min-width:0;width:auto}#expSheet .exp-row .en{flex:1 1 100%}#expSheet .exp-row .ea{flex:1 1 110px;min-width:0}#expSheet .exp-save{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom));display:flex;gap:8px;margin:12px -16px calc(-24px - env(safe-area-inset-bottom));padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -4px 12px rgba(0,0,0,.06);z-index:5}#expSheet .exp-save button{flex:1 1 0;margin:0}#expSheet .exp-save button:not(.secondary){flex:2 1 0}#expSheet .exp-row .eaw{position:relative;flex:1 1 110px;min-width:0;display:block}#expSheet .exp-row .eaw::before{content:"$";position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.65;pointer-events:none}#expSheet .exp-row .eaw .ea{width:100%;box-sizing:border-box;padding-left:28px}'
             + '#expSheet .exp-row button{flex:0 0 40px;min-height:40px;padding:0}#expSheet .exp-tot{display:flex;justify-content:space-between;align-items:center;margin:10px 0;padding:10px 12px;border-radius:12px;background:#eff6ff;font-weight:700;color:#1e3a8a}'
             + '#expSheet .exp-tot[hidden]{display:none}'
             + '#expSheet .exp-err{color:#b91c1c;font-size:13px;margin:6px 0}#expSheet .exp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}';
@@ -6026,8 +6046,8 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<div class="exp-tot" id="expSplitRow" hidden><span id="expSplitMe"></span><span id="expSplitSp"></span></div>'
             + '<div class="exp-tot"><span id="expTotLbl">Total per month</span><b id="expTotal">$0</b></div>'
             + '<div class="exp-err" id="expErr" hidden>Add at least one expense with an amount, or tap Cancel.</div>'
-            + '<div class="exp-btns"><button type="button" onclick="expCommit()">Use this list</button><button type="button" class="secondary" onclick="expCancel()">Cancel</button>'
-            + '<button type="button" class="link-btn" id="expStopBtn" onclick="expStop()">Stop using the list</button></div></div>';
+            + '<div class="exp-btns"><button type="button" class="link-btn" id="expStopBtn" onclick="expStop()">Stop using the list</button></div>'
+            + '<div class="exp-save"><button type="button" class="secondary" onclick="expCancel()">Cancel</button><button type="button" onclick="expCommit()">Save for this scenario</button></div></div>';
         document.body.appendChild(sh);
         return sh;
     }
@@ -6106,6 +6126,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const amt = document.getElementById('spendAmount');
         amt.dispatchEvent(new Event('input', { bubbles: true })); amt.dispatchEvent(new Event('change', { bubbles: true }));
         if (typeof refreshCollapsibleSummaries === 'function') refreshCollapsibleSummaries();
+        try { saveProfileProgress(); showSaveBadge('Saved for this scenario'); } catch (e) { /* ignore */ }
     }
 
     function showInfo(title, html) {
