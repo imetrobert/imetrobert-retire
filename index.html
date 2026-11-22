@@ -535,6 +535,8 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                 <span class="note-text">Used to independently track when your spouse becomes eligible for their own QPP/OAS/RREGOP — no longer assumed to match your age track.</span>
             </div>
 
+            <details class="fold" id="stmtShortcut"><summary id="stmtSum">Read a government statement (Retraite Québec)</summary><div class="fold-body" id="stmtBody"></div></details>
+
             <div class="btn-group step-nav">
                 <button type="button" onclick="nextStep()">Next: Your money →</button>
             </div>
@@ -5500,6 +5502,7 @@ The numbers in that example are placeholders from a prior year — replace every
   sync();
 })();
 </script>
+<script src="statements.js" defer></script>
 <script src="account.js" defer></script>
 </body>
 </html>

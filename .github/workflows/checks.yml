@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['index.html', 'account.js', 'scripts/**']
+    paths: ['index.html', 'account.js', 'statements.js', 'vendor/**', 'tests/**', 'scripts/**']
 permissions:
   contents: write
 jobs:
@@ -25,6 +25,7 @@ jobs:
           pip install playwright
           python3 -m playwright install --with-deps chromium
           python3 scripts/test_account.py
+          python3 scripts/test_statements.py
       - name: Refresh the code map
         run: python3 scripts/code_map.py
       - name: Commit the code map if it changed

@@ -74,3 +74,15 @@ if os.path.exists('account.js'):
         sys.exit('account.js uses innerHTML. Build elements with el() so account data cannot inject markup.')
     print('OK: account.js parses, no secret key, no innerHTML.')
 
+# --- statements.js: reads a PDF on the device; must never talk to a server ---
+if os.path.exists('statements.js'):
+    st = open('statements.js', encoding='utf-8').read()
+    if subprocess.run(['node', '--check', 'statements.js']).returncode:
+        sys.exit('statements.js has a syntax error')
+    for pat in (r'\bfetch\s*\(', r'XMLHttpRequest', r'sendBeacon', r'WebSocket\s*\(', r'https?://'):
+        if re.search(pat, st):
+            sys.exit('statements.js must make no network calls and name no web address (' + pat + '). Statements are read on the device only.')
+    for need in ('vendor/pdfjs/pdf.min.js', 'vendor/pdfjs/pdf.worker.min.js'):
+        if not os.path.exists(need):
+            sys.exit('missing ' + need + ' (self-hosted pdf.js, see vendor/pdfjs/README.txt)')
+    print('OK: statements.js parses, no network calls, pdf.js is self-hosted.')
