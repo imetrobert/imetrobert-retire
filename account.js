@@ -231,6 +231,7 @@
       .then(function (rows) { V.rows = rows; V.haveRows = rows.length > 0; if (rows.length && !V.salt) V.salt = unb64(JSON.parse(rows[0].blob).salt); return 'ok'; })
       .catch(function () { return 'fail'; });
   };
+  window.awrResetPlan = function () { V.planId = null; };
   function deleteRow(rowId) {
     return token().then(function (tk) { return call('DELETE', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(rowId), null, tk); })
       .then(function (r) { if (!r.ok) throw new Error('server'); });
@@ -298,10 +299,16 @@
       }
       body.appendChild(el('h3', {}, [t('saveH')]));
       var sb = el('button', { class: 'awr-btn', type: 'button', onclick: function () {
+        var ex = V.planId && (V.rows || []).filter(function (r) { return r.p && r.p.id === V.planId; })[0];
+        if (ex && window.askSaveChoice) {
+          window.askSaveChoice((ex.p && ex.p.name) || t('unnamed'), function (mode, nm) { if (!mode) return; if (mode === 'new' && window.saveDetach) window.saveDetach(nm); doSave(); });
+        } else doSave();
+        function doSave() {
         sb.disabled = true; say(msg, t('working'));
         savePlan().then(function () { return listRows(); }).then(function (raw) { V.rawRows = raw; return unlockWith(V.pass, raw); }).then(function (rows) {
           V.rows = rows; V.haveRows = rows.length > 0; if (rows.length && !V.salt) V.salt = unb64(JSON.parse(rows[0].blob).salt); say(msg, t('saved'), 'good'); render();
         }).catch(function () { say(msg, t('saveFail'), 'bad'); render(); });
+        }
       } }, [t('saveBtn')]);
       body.appendChild(sb);
       body.appendChild(el('h3', {}, [t('listH')]));

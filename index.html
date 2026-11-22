@@ -3193,7 +3193,52 @@ The numbers in that example are placeholders from a prior year — replace every
         return (r.depletionAge !== null && r.depletionAge !== undefined ? 'Funds run short at age ' + r.depletionAge : 'Funds last the whole plan') + ' · ending ' + money(r.finalPortfolio);
     }
 
-    function saveProfileAndResults() {
+    // ---- Save choice: when you are already working in a saved scenario, overwrite it or save a new one ----
+    const CUR_KEY = 'csl_retire_profile_v2026';
+    function savedScenarioLabel() {
+        try {
+            const c = JSON.parse(localStorage.getItem(CUR_KEY) || 'null'), s = c && c.id && getAllProfiles()[c.id];
+            if (s && s.savedExplicitly) return s.name || 'this scenario';
+        } catch (e) { /* treated as not working in a saved scenario */ }
+        return null;
+    }
+    window.saveDetach = function (newName) {
+        document.getElementById('profileName').value = newName;
+        const rb = document.getElementById('resultsProfileName'); if (rb) rb.value = newName;
+        try { localStorage.removeItem(CUR_KEY); } catch (e) { /* ignore */ }
+        if (window.awrResetPlan) window.awrResetPlan();
+    };
+    // Inline dialog (window.confirm is unreliable on iPhone). cb(mode, newName): mode is 'overwrite', 'new' or null (cancel).
+    window.askSaveChoice = function (label, cb) {
+        const old = document.getElementById('saveChoice'); if (old) old.remove();
+        const ov = document.createElement('div');
+        ov.id = 'saveChoice';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;';
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto;';
+        const mk = (tag, text, css) => { const e = document.createElement(tag); e.textContent = text; if (css) e.style.cssText = css; return e; };
+        const close = mode => { ov.remove(); cb(mode, mode === 'new' ? nameIn.value.trim() || (label + ' (copy)') : null); };
+        card.appendChild(mk('h3', 'Save scenario', 'margin:0 0 8px;'));
+        card.appendChild(mk('p', 'You are working in “' + label + '”. What would you like to do?', 'margin:0 0 12px;'));
+        const b1 = mk('button', 'Overwrite “' + label + '”', 'width:100%;margin:0;'); b1.type = 'button'; b1.className = 'save-btn'; b1.onclick = () => close('overwrite');
+        card.appendChild(b1);
+        card.appendChild(mk('p', 'Replaces the saved copy with what is on screen.', 'margin:4px 0 14px;font-size:13px;color:#64748b;'));
+        card.appendChild(mk('p', 'Name for the new scenario', 'margin:0 0 4px;font-weight:600;'));
+        const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.maxLength = 60; nameIn.value = label + ' (copy)'; nameIn.style.cssText = 'width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;';
+        card.appendChild(nameIn);
+        const b2 = mk('button', 'Save as a new scenario', 'width:100%;margin:0 0 8px;'); b2.type = 'button'; b2.className = 'save-btn'; b2.onclick = () => close('new');
+        card.appendChild(b2);
+        const b3 = mk('button', 'Cancel', 'width:100%;margin:0;'); b3.type = 'button'; b3.className = 'secondary'; b3.onclick = () => close(null);
+        card.appendChild(b3);
+        ov.appendChild(card); document.body.appendChild(ov);
+    };
+    function saveWithChoice(done) {
+        const lbl = savedScenarioLabel();
+        if (lbl === null) { done(); return; }
+        window.askSaveChoice(lbl, (mode, nm) => { if (!mode) return; if (mode === 'new') window.saveDetach(nm); done(); });
+    }
+    function saveProfileAndResults() { saveWithChoice(saveProfileAndResultsNow); }
+    function saveProfileAndResultsNow() {
         const nameBox = document.getElementById('resultsProfileName');
         if (nameBox) document.getElementById('profileName').value = nameBox.value.trim();
         const profile = getProfileData();
@@ -3210,8 +3255,9 @@ The numbers in that example are placeholders from a prior year — replace every
     }
 
     // Saves on this device, then pushes the same scenario to the cloud (asks for the passphrase first if locked).
-    function saveToBoth() {
-        saveProfileAndResults();
+    function saveToBoth() { saveWithChoice(saveToBothNow); }
+    function saveToBothNow() {
+        saveProfileAndResultsNow();
         const cur = getAllProfiles()[justSavedId];
         if (!cur || !window.awrSyncPlan) { showSaveBadge('Saved on this device. Cloud saving is not available here'); return; }
         window.awrSyncPlan(cur).then(function (r) {
