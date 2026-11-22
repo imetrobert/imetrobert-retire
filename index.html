@@ -564,6 +564,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <input type="number" id="spendAmount" value="4000" step="100">
             <span class="note-text" id="spendFrequencyNote">Multiplied by 12 automatically for annual net spending targets. Withdrawing weekly instead of monthly also slightly changes how much growth your accounts earn during the year — see the note on Step 3.</span>
             <div id="expLinkRow" class="exp-linkrow"><button type="button" class="link-btn" onclick="openExpenses()">Optional: calculate this from a list of your expenses →</button></div>
+            <div id="expSpRow" class="exp-linkrow" hidden><button type="button" class="link-btn" onclick="hhOpenSharedExp()">Household expenses: see and change who pays what →</button></div>
             <div id="expLockBox" class="exp-lock" hidden>
                 <strong>Calculated from your expense list</strong>
                 <span id="expLockText" class="exp-lock-t"></span>
@@ -5486,7 +5487,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '.hh-cards{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hh-card{flex:1 1 30%;min-width:96px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px}.hh-card small{display:block;color:#64748b;font-size:11px}.hh-card b{display:block;font-size:17px;color:#0f172a}.hh-card span{font-size:11px;color:#64748b}'
             + '.hh-split{margin:8px 0}.hh-split input{width:110px;display:inline-block;margin:0 6px}.hh-status{margin:4px 0;font-size:13px}'
             + '.hh-tablewrap{overflow-x:auto;margin:8px 0}.hh-table{border-collapse:collapse;width:100%;min-width:640px;font-size:12px}.hh-table th,.hh-table td{border-bottom:1px solid #e2e8f0;padding:5px 6px;text-align:right;vertical-align:top}.hh-table th{background:#f1f5f9;position:sticky;top:0}.hh-table td:first-child,.hh-table th:first-child{text-align:left}.hh-table td small{display:block;color:#64748b;font-size:10.5px;white-space:nowrap}.hh-table td small i{font-style:normal}.hh-table tr.hh-short td{background:#fff7ed}'
-            + '#expSheet .exp-row .ep{flex:0 0 62px}#expSheet .exp-rec{font-size:13px;color:#1e3a8a;margin:6px 0}';
+            + '#expSheet .exp-row .ep{flex:0 0 62px}#expSheet .exp-row .ep2{display:flex;gap:6px;flex:1 1 150px;min-width:0}#expSheet .ep2 label{display:flex;flex-direction:column;font-size:11px;margin:0;flex:1 1 0;min-width:0;color:#475569}#expSheet .ep2 .ep{flex:1 1 auto;width:100%;margin:0}#expSheet .exp-note[hidden]{display:none}#expSheet .exp-tot[hidden]{display:none}#expSheet .exp-rec{font-size:13px;color:#1e3a8a;margin:6px 0}';
         document.head.appendChild(st);
     })();
     function hhIsCouple() { const c = document.getElementById('calcMode'); return !!c && c.value === 'couple'; }
@@ -5562,6 +5563,7 @@ The numbers in that example are placeholders from a prior year — replace every
         HH_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = sp; });
         if (!sp && typeof expSync === 'function') expSync();
         const lr = document.getElementById('expLinkRow'); if (lr && sp) lr.style.display = 'none';
+        { const sr = document.getElementById('expSpRow'); if (sr) sr.hidden = !sp; }
         const lb = document.querySelector('#expLockBox .exp-lock-b'); if (lb) lb.style.display = sp ? 'none' : '';
     }
     function hhSwitch(to) {
@@ -5821,13 +5823,31 @@ The numbers in that example are placeholders from a prior year — replace every
         out.textContent = 'Recommended: your share is ' + r.pct + '% of these expenses.' + (r.better && save > 50 ? ' Estimated tax and clawback saved over the plan, compared with the automatic split: $' + Math.round(save).toLocaleString() + '.' : ' About the same tax as the automatic split.');
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
+    function hhPctClamp(v) { const n = parseFloat(v); return isFinite(n) ? Math.min(100, Math.max(0, n)) : null; }
     function hhExpPctInput(it) {
         if (!hhIsCouple() && !expShareMode()) return null;
-        const pc = document.createElement('input'); pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = expShareMode() ? '100' : 'Auto';
+        if (hhIsCouple()) {   // two linked boxes: what each spouse pays of this expense always adds up to 100%
+            const wrap = document.createElement('div'); wrap.className = 'ep2';
+            const mk = k => {
+                const lb = document.createElement('label'), sp = document.createElement('span'), pc = document.createElement('input');
+                sp.textContent = hhLabel(k).slice(0, 12);
+                pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = 'Auto';
+                pc.setAttribute('aria-label', hhLabel(k) + ' pays %');
+                lb.appendChild(sp); lb.appendChild(pc); wrap.appendChild(lb); return pc;
+            };
+            const a = mk('me'), b = mk('sp');
+            const fill = () => { const v = hhPctClamp(it.pct); a.value = v === null ? '' : String(v); b.value = v === null ? '' : String(Math.round((100 - v) * 100) / 100); };
+            fill();
+            a.oninput = () => { const v = hhPctClamp(a.value); it.pct = v === null ? '' : String(v); b.value = v === null ? '' : String(Math.round((100 - v) * 100) / 100); expUpdateTotal(); };
+            b.oninput = () => { const v = hhPctClamp(b.value); it.pct = v === null ? '' : String(Math.round((100 - v) * 100) / 100); a.value = it.pct; expUpdateTotal(); };
+            return wrap;
+        }
+        const pc = document.createElement('input'); pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = '100';
         pc.setAttribute('aria-label', 'Your %'); pc.value = (it.pct === null || it.pct === undefined) ? '' : it.pct;
         pc.oninput = () => { it.pct = pc.value; expUpdateTotal(); };
         return pc;
     }
+    function hhOpenSharedExp() { hhSwitch('me'); showStep(2); openExpenses(); }
 
     function hhChooseAges(p, taxRules) {
         let chosenQppAge = p.qppStartAge;
@@ -5901,7 +5921,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function expSetAll() {
         const v = parseFloat(document.getElementById('expAllPct').value);
         if (!isFinite(v) || v < 0 || v > 100) { document.getElementById('expShareMsg').textContent = 'Enter a percent from 0 to 100.'; return; }
-        expDraft.items.forEach(i => { i.pct = (v === 100) ? '' : String(v); });
+        expDraft.items.forEach(i => { i.pct = (v === 100 && !hhIsCouple()) ? '' : String(v); });
         document.getElementById('expShareMsg').textContent = ''; expRender();
     }
     function expMoney(n) { return '$' + n.toLocaleString('en-CA', { maximumFractionDigits: 2 }); }
@@ -5942,14 +5962,15 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<label for="expAllFreq">Set all rows to</label><div class="exp-btns"><select id="expAllFreq"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select><button type="button" class="secondary" onclick="expSetAllFreq()">Set all rows</button></div>'
             + '<label for="expFreq">Show the total per</label>'
             + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select>'
-            + '<div id="expHhBox" hidden><span class="exp-note">Who pays: in the last box of each row, enter the % of that expense you pay (the rest is your spouse\'s). Leave it blank to use the automatic split.</span>'
+            + '<div id="expHhBox" hidden>'
             + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
-            + '<div id="expShareBox" hidden><span class="exp-note">You live with others, so enter the % of each expense that you pay in the last box of the row (blank means 100%). Only your share goes into the plan.</span>'
-            + '<label for="expAllPct">My share of all expenses (%)</label><div class="exp-btns"><input type="number" id="expAllPct" min="0" max="100" step="any" inputmode="decimal" placeholder="100" style="max-width:110px"><button type="button" class="secondary" onclick="expSetAll()">Apply to all rows</button></div><div class="exp-rec" id="expShareMsg"></div></div>'
+            + '<div id="expShareBox" hidden><span class="exp-note" id="expCoupleNote" hidden>Each row has two boxes, one for each of you. Change either one and the other adjusts so they always add up to 100%. Leave both blank to use the automatic split. Your spouse can change these too: tap their name, then "Household expenses".</span><span class="exp-note" id="expShareNote">You live with others, so enter the % of each expense that you pay in the last box of the row (blank means 100%). Only your share goes into the plan.</span>'
+            + '<label for="expAllPct" id="expAllPctLbl">My share of all expenses (%)</label><div class="exp-btns"><input type="number" id="expAllPct" min="0" max="100" step="any" inputmode="decimal" placeholder="100" style="max-width:110px"><button type="button" class="secondary" onclick="expSetAll()">Apply to all rows</button></div><div class="exp-rec" id="expShareMsg"></div></div>'
             + '<div id="expList"></div>'
             + '<button type="button" class="secondary" onclick="expAddRow()">+ Add an expense</button>'
             + '<details class="more"><summary>Paste a list</summary><textarea id="expPaste" rows="6" placeholder="One expense per line, name then amount"></textarea><button type="button" class="secondary" onclick="expPasteRows()">Add pasted rows</button><div class="exp-rec" id="expPasteMsg"></div></details>'
             + '<div class="exp-tot" id="expAllRow" hidden><span id="expAllLbl">Household total per month</span><b id="expAll">$0</b></div>'
+            + '<div class="exp-tot" id="expSplitRow" hidden><span id="expSplitMe"></span><span id="expSplitSp"></span></div>'
             + '<div class="exp-tot"><span id="expTotLbl">Total per month</span><b id="expTotal">$0</b></div>'
             + '<div class="exp-err" id="expErr" hidden>Add at least one expense with an amount, or tap Cancel.</div>'
             + '<div class="exp-btns"><button type="button" onclick="expCommit()">Use this list</button><button type="button" class="secondary" onclick="expCancel()">Cancel</button>'
@@ -5963,7 +5984,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const sh = buildExpSheet();
         document.getElementById('expFreq').value = expDraft.freq;
         document.getElementById('expErr').hidden = true;
-        { const sb = document.getElementById('expShareBox'); if (sb) { sb.hidden = !expShareMode(); document.getElementById('expShareMsg').textContent = ''; } }
+        { const sb = document.getElementById('expShareBox'); if (sb) { sb.hidden = !(expShareMode() || hhIsCouple()); document.getElementById('expShareMsg').textContent = ''; const cp = hhIsCouple(); document.getElementById('expShareNote').hidden = cp; document.getElementById('expCoupleNote').hidden = !cp; document.getElementById('expAllPctLbl').textContent = cp ? 'My share of all expenses (%), the rest is my spouse\'s' : 'My share of all expenses (%)'; } }
         { const hb = document.getElementById('expHhBox'); if (hb) { hb.hidden = !hhIsCouple(); document.getElementById('expRec').textContent = ''; } }
         document.getElementById('expStopBtn').style.display = expState().on ? '' : 'none';
         expRender();
@@ -6008,12 +6029,18 @@ The numbers in that example are placeholders from a prior year — replace every
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     function expUpdateTotal() {
-        const sm = expShareMode(), u = expDraft.freq, w = freqWord(u), all = expTotal(expDraft.items, u), mine = expSpend(expDraft.items, u);
-        const showAll = sm && Math.abs(all - mine) > 0.004;
+        const sm = expShareMode(), cp = hhIsCouple(), u = expDraft.freq, w = freqWord(u), all = expTotal(expDraft.items, u), mine = expSpend(expDraft.items, u);
+        let showAll = sm && Math.abs(all - mine) > 0.004;
+        const sr = document.getElementById('expSplitRow');
+        if (cp) {
+            const auto = HH.shareAuto || 50; let m = 0; expDraft.items.forEach(i => { const pc = hhPctClamp(i.pct); m += Math.max(0, parseFloat(i.amount) || 0) * expMult(expFreqOf(i, u)) * (pc === null ? auto : pc) / 100; });
+            m = Math.round(m / expMult(u) * 100) / 100;
+            sr.hidden = false; document.getElementById('expSplitMe').textContent = hhLabel('me') + ': ' + expMoney(m); document.getElementById('expSplitSp').textContent = hhLabel('sp') + ': ' + expMoney(Math.round((all - m) * 100) / 100);
+        } else if (sr) sr.hidden = true;
         document.getElementById('expAllRow').hidden = !showAll;
         document.getElementById('expAllLbl').textContent = 'Household total per ' + w;
         document.getElementById('expAll').textContent = expMoney(all);
-        document.getElementById('expTotLbl').textContent = (showAll ? 'Your share per ' : 'Total per ') + w;
+        document.getElementById('expTotLbl').textContent = (showAll ? 'Your share per ' : cp ? 'Household total per ' : 'Total per ') + w;
         document.getElementById('expTotal').textContent = expMoney(mine);
         document.getElementById('expErr').hidden = true;
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
