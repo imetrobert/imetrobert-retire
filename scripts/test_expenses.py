@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Checks the optional expense list (Step 2): it fills and locks the spending fields, saves with the profile,
 survives reload of a saved profile, and the plan uses the total. Run: python3 scripts/test_expenses.py (needs playwright)."""
-import os, sys
+import os, re, sys
 from playwright.sync_api import sync_playwright
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 bad = []
@@ -68,6 +68,27 @@ with sync_playwright() as pw:
     check(got == [['Alpha bus', '10'], ['Beta', '5.25'], ['Gamma food', '1500']], 'pasted rows: %s' % got)
     check('Added 3 expenses' in pg.inner_text('#expPasteMsg'), 'paste message: ' + pg.inner_text('#expPasteMsg'))
     pg.evaluate("expCancel()")
+    # living with others but planning just for me: each expense has "Your %" (blank = 100%); only my share drives spending
+    pg.evaluate("populateForm({calcMode:'single'})"); pg.evaluate("document.getElementById('livesAlone').value = 'no'; document.getElementById('livesAlone').dispatchEvent(new Event('change'))")
+    pg.evaluate("openExpenses(); expDraft.items = [{name:'Rent',amount:'2000',pct:'50'},{name:'Food',amount:'1000',pct:''},{name:'Phone',amount:'100',pct:'0'}]; expRender()")
+    check(pg.is_visible('#expShareBox') and pg.locator('#expList .ep').count() == 3, 'share box and one % box per row show when living with others')
+    check(re.sub(r'\D', '', pg.inner_text('#expTotal')) == '2000' and re.sub(r'\D', '', pg.inner_text('#expAll')) == '3100', 'your share $2,000 of household $3,100: %s / %s' % (pg.inner_text('#expTotal'), pg.inner_text('#expAll')))
+    pg.fill('#expAllPct', '40'); pg.evaluate("expSetAll()")
+    check(pg.evaluate("expDraft.items.map(i => i.pct)") == ['40', '40', '40'], 'apply to all rows')
+    check(re.sub(r'\D', '', pg.inner_text('#expTotal')) == '1240', 'share after apply-all: ' + pg.inner_text('#expTotal'))
+    pg.fill('#expAllPct', '100'); pg.evaluate("expSetAll()")
+    check(not pg.is_visible('#expAllRow'), 'no household line when every row is 100%')
+    pg.evaluate("expDraft.items[0].pct = '25'; expDraft.items[2].pct = ''; expUpdateTotal(); expCommit()")
+    check(pg.evaluate("document.getElementById('spendAmount').value") == '1600' and pg.evaluate("document.getElementById('spendAmount').disabled"), 'spending field = my share (500 + 1000 + 100)')
+    check(('Your share of the expenses adds up to' in pg.inner_text('#expLockText') or 'Votre part des dépenses totalise' in pg.inner_text('#expLockText')), 'lock text says share: ' + pg.inner_text('#expLockText'))
+    prof = pg.evaluate("getProfileData()")
+    check([i.get('pct') for i in prof['expenseItems']] == [25, None, None], 'percents saved: %s' % [i.get('pct') for i in prof['expenseItems']])
+    pg.evaluate("p => populateForm(p)", prof)
+    check(pg.evaluate("document.getElementById('spendAmount').value") == '1600', 'share survives a saved plan')
+    pg.evaluate("document.getElementById('livesAlone').value = 'yes'; document.getElementById('livesAlone').dispatchEvent(new Event('change'))")
+    check(pg.evaluate("document.getElementById('spendAmount').value") == '3100', 'living alone: full total again')
+    pg.evaluate("document.getElementById('livesAlone').value = 'no'; document.getElementById('livesAlone').dispatchEvent(new Event('change'))")
+    check(pg.evaluate("document.getElementById('spendAmount').value") == '1600', 'living with others: share again')
     check(not errs, 'page errors: %s' % errs[:2])
     br.close()
 if bad:
