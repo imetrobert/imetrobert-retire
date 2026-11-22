@@ -101,6 +101,26 @@ with sync_playwright() as pw:
             if abs(r['resid']) > 1: fails.append('plan: age %d, scenario %d: money in minus money out is $%.2f (must be $0)' % (r['age'], i, r['resid']))
             if abs(r['dtax']) > 5: fails.append('plan: age %d, scenario %d: tax in the plan differs from calculateTax by $%.2f' % (r['age'], i, r['dtax']))
     print('yearly plan: %d rows checked' % rows_checked)
+    # pension income splitting: income moved between spouses changes tax and OAS clawback, not cash
+    random.seed(5); split_rows = 0
+    for i in range(10):
+        over = dict(calcMode='single', currentAge=70, alreadyRetired=True, spendFrequency='monthly', spendAmount=random.choice([4000, 8000]), currentRrsp=900000, currentTfsa=0,
+                    currentNonReg=0, contribNonReg=0, contribRrsp=0, contribTfsa=0, liraBalance=0, fedDcBalance=0, ftqBalance=0, ownPensionAnnual=random.choice([0, 30000]),
+                    ownPensionStartAge=60, inflationMode='none', returnPre=4, returnPost=4, lifeExpectancy=90, livesAlone='no', returnModel='flat', events=[], recurringEvents=[], extraRegAmt=0,
+                    hhTaxAdj=[random.choice([-6000, -2500, 0, 3000, 7000]) for _ in range(25)])
+        over['targetAge'] = 70; over[key] = 1000; over['oasMonthlyAmt'] = 740
+        rows = pg.evaluate("""([o]) => { const p = Object.assign(getProfileData(), o), rules = getTaxRules();
+            return runSimulation(p, 65, 65, rules, false).scheduleRows.map(r => {
+              const reg = r.rrspDraw + r.liraDraw + r.rlifUnlockedDraw + r.ftqDraw, gov = r.qppInc || r.cppInc || 0, adj = r.splitAdj || 0;
+              const taxable = reg + gov + (r.oasIncGross - r.clawback) + r.pensionInc + (r.nonRegYieldIncome || 0) + adj;
+              const tax = calculateTax(taxable, r.age, Math.max(0, (r.age >= 65 ? reg + r.pensionInc : r.pensionInc) + adj), rules, {alone: false}).totalTax;
+              const inn = r.rrspDraw + r.liraDraw + r.nonRegDraw + r.ftqDraw + r.tfsaDraw + r.rlifUnlockedDraw + gov + r.oasIncGross + r.pensionInc;
+              return {age: r.age, adj: adj, resid: inn - (r.actualNetTakeHome + r.taxPaid + r.clawback + r.reinvested), dtax: r.taxPaid - tax}; }); }""", [over])
+        for r in rows:
+            split_rows += 1
+            if abs(r['resid']) > 1: fails.append('split plan: age %d, scenario %d: money in minus money out is $%.2f' % (r['age'], i, r['resid']))
+            if abs(r['dtax']) > 5: fails.append('split plan: age %d, scenario %d: tax with income moved ($%s) differs from calculateTax by $%.2f' % (r['age'], i, r['adj'], r['dtax']))
+    print('pension splitting: %d rows checked' % split_rows)
     br.close()
 
 if fails:

@@ -48,6 +48,23 @@ with sync_playwright() as pw:
     # the household person plan equals a plain single-person plan on that share
     same = pg.evaluate("""() => { const A = HH.plans.me, r = getTaxRules(); const run = runSimulation(A.p, A.q, A.o, r, true); return Math.abs(run.finalPortfolio - A.run.finalPortfolio) < 1; }""")
     check(same, 'person plan matches the single-person engine')
+    # pension income splitting: moves up to half of the higher earner's eligible pension income, only when it lowers tax
+    pis = pg.evaluate("""() => { const a = HH.plans.me.run.scheduleRows, b = HH.plans.sp.run.scheduleRows; let zero = true, cap = true, moved = 0;
+        for (let i = 0; i < Math.min(a.length, b.length); i++) { const x = a[i].splitAdj || 0, y = b[i].splitAdj || 0;
+            if (Math.abs(x + y) > 1) zero = false; moved += Math.abs(x);
+            const giver = x < 0 ? a[i] : b[i], t = Math.abs(x); if (t > 0.5 * giver.splitElig + 1) cap = false; }
+        return { zero: zero, cap: cap, moved: moved, info: HH.pisInfo, tax: [HH.plans.me, HH.plans.sp].reduce((s, pl) => s + hhTaxSum(pl), 0) }; }""")
+    check(pis['zero'] and pis['cap'], 'splitting: what one spouse gives the other receives, never more than 50%% of eligible pension income: %s' % pis)
+    check(pis['info'] is not None and pis['info']['saved'] >= 0, 'splitting summary exists')
+    if pis['moved'] > 0:
+        check(pg.is_visible('#hhPisChk') and 'Moved to' in pg.inner_text('#hhPanel'), 'grid shows the pension split column')
+    pg.evaluate("document.getElementById('hhPisChk').click()")
+    off = pg.evaluate("() => ({ pis: HH.pis, moved: HH.plans.me.run.scheduleRows.concat(HH.plans.sp.run.scheduleRows).some(r => r.splitAdj), tax: [HH.plans.me, HH.plans.sp].reduce((s, pl) => s + hhTaxSum(pl), 0) })")
+    check(off['pis'] == 'off' and not off['moved'], 'switching splitting off moves nothing')
+    check(off['tax'] >= pis['tax'] - 1, 'splitting never raises combined tax: on %.0f, off %.0f' % (pis['tax'], off['tax']))
+    check(pg.evaluate("getProfileData().hhPis") == 'off', 'splitting choice is saved with the plan')
+    pg.evaluate("document.getElementById('hhPisChk').click()")
+    check(pg.evaluate("HH.pis") == 'on', 'switching splitting back on')
     # person tabs
     pg.evaluate("hhShowView('me')"); check(pg.is_visible('#yearCards') or pg.is_visible('#heroSummary'), 'my tab shows the normal results')
     check(not pg.is_visible('#hhPanel'), 'panel hidden on my tab')
