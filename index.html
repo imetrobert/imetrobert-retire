@@ -5253,7 +5253,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const whLines = accLines(k => WH[k] || 0);
             const whOf = lbl => { const m = whLines.find(x => x[0] === lbl); return m ? m[1] : 0; };
             const taxAcc = accLines(k => pu[k] ? pu[k].tax : 0);
-            let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('Nothing held back: set this aside yourself', null, true) : (has(whOf(x[0])) ? R('Bank holds back ' + fmtNum(whOf(x[0])) + ' at source on this withdrawal', null, true) : R('No tax held back on this part (the yearly minimum): set it aside yourself', null, true)))).join('');
+            let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.', null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
             if (has(taxPen)) s2 += R('From QPP / OAS / pension', taxPen);
             if (has(r.clawback)) s2 += R('Includes OAS paid back (clawback)', r.clawback, true);
             if (has(r.withholdingTax)) {
@@ -5320,7 +5320,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 if (has(x.inc)) acctHtml += '<div class="yp-al">Goes to living costs <b>' + fmtNum(x.inc) + '</b></div>';
                 if (has(x.evt)) acctHtml += '<div class="yp-al">Goes to one-time costs <b>' + fmtNum(x.evt) + '</b></div>';
                 if (has(x.tax)) acctHtml += '<div class="yp-al">Goes to tax <b>' + fmtNum(x.tax) + '</b></div>';
-                if (has(x.wd)) { const w = whOf(lbl); if (has(w)) acctHtml += '<div class="yp-al wht">Bank holds back ' + fmtNum(w) + ' at source, so you receive ' + fmtNum(Math.max(0, x.wd - w)) + '</div>'; else if (has(x.tax)) acctHtml += '<div class="yp-al wht">Nothing held back: set the tax aside yourself</div>'; }
+                if (has(x.wd)) { const w = whOf(lbl); if (has(w)) acctHtml += '<div class="yp-al wht">The bank withholds ' + fmtNum(w) + ', which will automatically be used to pay part of your tax owed for the year. So you will receive ' + fmtNum(Math.max(0, x.wd - w)) + ' in pocket.</div>'; else if (has(x.tax)) acctHtml += '<div class="yp-al wht">There is no withholding tax, so put this money aside: it is needed to pay your tax bill.</div>'; }
                 if (has(x.tr)) {
                     if (trDen > 0 && dest.length) acctHtml += '<div class="yp-al">Move ' + fmtNum(x.tr) + ': ' + dest.map(d => fmtNum(x.tr * d[1] / trDen) + ' to ' + d[0]).join(', ') + '</div>';
                     else acctHtml += '<div class="yp-al">Stays invested <b>' + fmtNum(x.tr) + '</b></div>';
