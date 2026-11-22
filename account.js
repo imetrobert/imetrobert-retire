@@ -46,6 +46,7 @@
       saveH: 'Save this plan to my account', saveHelp: 'Your plan is encrypted on this device before it is saved to your account, so you can open it on any device. (Save / load scenarios on this device keeps copies in this browser only.) Only your passphrase can open it, and it cannot be recovered if forgotten.',
       first: 'First time: choose a passphrase of at least 10 characters (a few words works well). You will need it on every device.',
       pass: 'Passphrase', pass2: 'Repeat the passphrase', unlock: 'Unlock my plans', saveBtn: 'Save this plan', lock: 'Lock',
+      devSame: '✓ Same on this device and in the cloud', devDiff: '⚠ Different from this device\'s copy', devNone: 'Not saved on this device',
       listH: 'My saved plans', none: 'No plans saved yet.', open: 'Open in the form', del: 'Delete', unnamed: 'Unnamed plan', savedOn: 'Saved',
       tooShort: 'The passphrase must be at least 10 characters.', mismatch: 'The two passphrases do not match.',
       badPass: 'Wrong passphrase, or a saved plan was damaged.', working: 'Working…', saved: 'Saved to your account.', unlocked: 'Unlocked.',
@@ -67,6 +68,7 @@
       saveH: 'Enregistrer ce plan dans mon compte', saveHelp: 'Votre plan est chiffré sur cet appareil avant d’être enregistré dans votre compte, et vous pouvez l’ouvrir sur tout appareil. (L’élément de menu Enregistrés sur cet appareil conserve des copies dans ce navigateur seulement.) Seule votre phrase secrète peut l’ouvrir, et elle ne peut pas être récupérée si elle est oubliée.',
       first: 'Première fois : choisissez une phrase secrète d’au moins 10 caractères (quelques mots suffisent). Vous en aurez besoin sur chaque appareil.',
       pass: 'Phrase secrète', pass2: 'Répétez la phrase secrète', unlock: 'Déverrouiller mes plans', saveBtn: 'Enregistrer ce plan', lock: 'Verrouiller',
+      devSame: '✓ Identique sur cet appareil et dans le nuage', devDiff: '⚠ Différent de la copie de cet appareil', devNone: 'Pas enregistré sur cet appareil',
       listH: 'Mes plans enregistrés', none: 'Aucun plan enregistré pour le moment.', open: 'Ouvrir dans le formulaire', del: 'Supprimer', unnamed: 'Plan sans nom', savedOn: 'Enregistré',
       tooShort: 'La phrase secrète doit contenir au moins 10 caractères.', mismatch: 'Les deux phrases secrètes ne correspondent pas.',
       badPass: 'Phrase secrète incorrecte, ou un plan enregistré est endommagé.', working: 'En cours…', saved: 'Enregistré dans votre compte.', unlocked: 'Déverrouillé.',
@@ -220,7 +222,7 @@
         if (existing) return call('PATCH', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(existing.rowId), { blob: blob, updated_at: new Date().toISOString() }, tk, { Prefer: 'return=minimal' });
         return call('POST', '/rest/v1/planner_profiles', { app: CFG.app, blob: blob }, tk, { Prefer: 'return=minimal' });
       });
-    }).then(function (r) { if (!r.ok) throw new Error('server'); });
+    }).then(function (r) { if (!r.ok) throw new Error('server'); try { if (window.planCloudMark) window.planCloudMark(p); } catch (e) {} });
   }
   function deleteRow(rowId) {
     return token().then(function (tk) { return call('DELETE', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(rowId), null, tk); })
@@ -256,6 +258,11 @@
   }
 
   /* ---------- panel: My plans ---------- */
+  function devState(cp) {
+    var st = 'none'; try { if (window.planDeviceState) st = window.planDeviceState(cp); } catch (e) {}
+    var map = { same: ['#dcfce7', '#166534', 'devSame'], diff: ['#ffedd5', '#9a3412', 'devDiff'], none: ['#f1f5f9', '#475569', 'devNone'] }[st];
+    return el('div', { style: 'margin:4px 0 6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:' + map[0] + ';color:' + map[1] }, [t(map[2])]);
+  }
   function closePanel() { var p = document.getElementById('awr-panel'); if (p) p.remove(); }
   function say(node, text, cls) { node.className = 'awr-msg' + (cls ? ' ' + cls : ''); node.textContent = text; }
   function openPanel() {
@@ -295,7 +302,7 @@
       V.rows.forEach(function (r) {
         var name = (r.p && r.p.name) || t('unnamed'), d = '';
         try { d = new Date(r.updated).toLocaleDateString(lang() === 'fr' ? 'fr-CA' : 'en-CA'); } catch (e) {}
-        body.appendChild(el('div', { class: 'awr-row' }, [el('strong', {}, [name]), el('br'), el('small', {}, [t('savedOn') + ' ' + d]), el('br'),
+        body.appendChild(el('div', { class: 'awr-row' }, [el('strong', {}, [name]), el('br'), el('small', {}, [t('savedOn') + ' ' + d]), el('br'), devState(r.p),
           el('button', { class: 'awr-btn', type: 'button', onclick: function () { openPlan(r.p); closePanel(); } }, [t('open')]),
           el('button', { class: 'awr-btn sec bad', type: 'button', onclick: function () {
             if (!window.confirm(t('confirmDel'))) return;
