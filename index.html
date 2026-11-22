@@ -5826,13 +5826,14 @@ The numbers in that example are placeholders from a prior year — replace every
     function hhPctClamp(v) { const n = parseFloat(v); return isFinite(n) ? Math.min(100, Math.max(0, n)) : null; }
     function hhExpPctInput(it) {
         if (!hhIsCouple() && !expShareMode()) return null;
-        if (hhIsCouple()) {   // two linked boxes: what each spouse pays of this expense always adds up to 100%
+        {   // two linked boxes: what each person pays of this expense always adds up to 100% (alone mode: me and my spouse / others)
+            const cp = hhIsCouple();
             const wrap = document.createElement('div'); wrap.className = 'ep2';
             const mk = k => {
                 const lb = document.createElement('label'), sp = document.createElement('span'), pc = document.createElement('input');
-                sp.textContent = hhLabel(k).slice(0, 12);
-                pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = 'Auto';
-                pc.setAttribute('aria-label', hhLabel(k) + ' pays %');
+                sp.textContent = cp ? hhLabel(k).slice(0, 12) : (k === 'me' ? 'You' : 'Spouse / others');
+                pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = cp ? 'Auto' : (k === 'me' ? '100' : '0');
+                pc.setAttribute('aria-label', (cp ? hhLabel(k) : (k === 'me' ? 'Your' : 'Spouse / others')) + ' pays %');
                 lb.appendChild(sp); lb.appendChild(pc); wrap.appendChild(lb); return pc;
             };
             const a = mk('me'), b = mk('sp');
@@ -5842,10 +5843,6 @@ The numbers in that example are placeholders from a prior year — replace every
             b.oninput = () => { const v = hhPctClamp(b.value); it.pct = v === null ? '' : String(Math.round((100 - v) * 100) / 100); a.value = it.pct; expUpdateTotal(); };
             return wrap;
         }
-        const pc = document.createElement('input'); pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = '100';
-        pc.setAttribute('aria-label', 'Your %'); pc.value = (it.pct === null || it.pct === undefined) ? '' : it.pct;
-        pc.oninput = () => { it.pct = pc.value; expUpdateTotal(); };
-        return pc;
     }
     function hhOpenSharedExp() { hhSwitch('me'); showStep(2); openExpenses(); }
 
@@ -5964,7 +5961,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select>'
             + '<div id="expHhBox" hidden>'
             + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
-            + '<div id="expShareBox" hidden><span class="exp-note" id="expCoupleNote" hidden>Each row has two boxes, one for each of you. Change either one and the other adjusts so they always add up to 100%. Leave both blank to use the automatic split. Your spouse can change these too: tap their name, then "Household expenses".</span><span class="exp-note" id="expShareNote">You live with others, so enter the % of each expense that you pay in the last box of the row (blank means 100%). Only your share goes into the plan.</span>'
+            + '<div id="expShareBox" hidden><span class="exp-note" id="expCoupleNote" hidden>Each row has two boxes, one for each of you. Change either one and the other adjusts so they always add up to 100%. Leave both blank to use the automatic split. Your spouse can change these too: tap their name, then "Household expenses".</span><span class="exp-note" id="expShareNote">You live with others, so enter the % of each expense that you pay. The other box shows the rest (spouse or others) and adjusts with it. Blank means you pay 100%. Only your share goes into the plan.</span>'
             + '<label for="expAllPct" id="expAllPctLbl">My share of all expenses (%)</label><div class="exp-btns"><input type="number" id="expAllPct" min="0" max="100" step="any" inputmode="decimal" placeholder="100" style="max-width:110px"><button type="button" class="secondary" onclick="expSetAll()">Apply to all rows</button></div><div class="exp-rec" id="expShareMsg"></div></div>'
             + '<div id="expList"></div>'
             + '<button type="button" class="secondary" onclick="expAddRow()">+ Add an expense</button>'

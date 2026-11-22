@@ -71,7 +71,10 @@ with sync_playwright() as pw:
     # living with others but planning just for me: each expense has "Your %" (blank = 100%); only my share drives spending
     pg.evaluate("populateForm({calcMode:'single'})"); pg.evaluate("document.getElementById('livesAlone').value = 'no'; document.getElementById('livesAlone').dispatchEvent(new Event('change'))")
     pg.evaluate("openExpenses(); expDraft.items = [{name:'Rent',amount:'2000',pct:'50'},{name:'Food',amount:'1000',pct:''},{name:'Phone',amount:'100',pct:'0'}]; expRender()")
-    check(pg.is_visible('#expShareBox') and pg.locator('#expList .ep').count() == 3, 'share box and one % box per row show when living with others')
+    check(pg.is_visible('#expShareBox') and pg.locator('#expList .ep').count() == 6, 'share box and two linked % boxes per row show when living with others')
+    check(pg.locator('#expList .ep').nth(1).input_value() == '50', 'spouse / others box shows the rest')
+    pg.locator('#expList .ep').nth(3).fill('30'); check(pg.evaluate("expDraft.items[1].pct") == '70', 'editing the other box adjusts mine')
+    pg.locator('#expList .ep').nth(3).fill(''); pg.evaluate("expDraft.items[1].pct = ''; expRender()")
     check(re.sub(r'\D', '', pg.inner_text('#expTotal')) == '2000' and re.sub(r'\D', '', pg.inner_text('#expAll')) == '3100', 'your share $2,000 of household $3,100: %s / %s' % (pg.inner_text('#expTotal'), pg.inner_text('#expAll')))
     pg.fill('#expAllPct', '40'); pg.evaluate("expSetAll()")
     check(pg.evaluate("expDraft.items.map(i => i.pct)") == ['40', '40', '40'], 'apply to all rows')
