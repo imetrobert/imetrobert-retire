@@ -107,6 +107,17 @@ with sync_playwright() as pw:
         document.getElementById('event1Age').value = 70; document.getElementById('event1Pct').value = 60;
         document.getElementById('event2Name').value = 'Roof'; document.getElementById('event2Amount').value = 8000; document.getElementById('event2Age').value = 71;
         document.getElementById('recur1Name').value = 'Condo'; document.getElementById('recur1Amount').value = 2000; document.getElementById('recur1StartAge').value = 66; document.getElementById('recur1EndAge').value = 68; document.getElementById('recur1Pct').value = 25; }""")
+    # linked boxes and the optimizer for events
+    pg.evaluate("document.getElementById('event1Pct').dispatchEvent(new Event('input', {bubbles: true}))")
+    check(pg.evaluate("document.getElementById('event1PctO').value") == '40', 'event: spouse box = 100 - mine')
+    pg.evaluate("document.getElementById('event1PctO').value = 30; document.getElementById('event1PctO').dispatchEvent(new Event('input', {bubbles: true}))"); check(pg.evaluate("document.getElementById('event1Pct').value") == '70', 'event: my box adjusts when the other is edited')
+    pg.evaluate("document.getElementById('event1Pct').value = 60; document.getElementById('event1Pct').dispatchEvent(new Event('input', {bubbles: true}))")
+    check(pg.evaluate("!document.getElementById('hhEvOpt').hidden"), 'event optimizer button shows for a couple')
+    pg.evaluate("hhRecommendEvents()")
+    rec = pg.inner_text('#hhEvRec'); check('Recommended: you pay' in rec or 'Recommandé : vous payez' in rec, 'event recommendation: ' + rec)
+    pc = pg.evaluate("['event1Pct','event2Pct','recur1Pct'].map(id => document.getElementById(id).value)")
+    check(len(set(pc)) == 1 and pc[0] != '', 'every event got the recommended percent: %s' % pc)
+    pg.evaluate("document.getElementById('event1Pct').value = 60; document.getElementById('event1PctO').value = 40; document.getElementById('event2Pct').value = ''; document.getElementById('event2PctO').value = ''; document.getElementById('recur1Pct').value = 25; document.getElementById('recur1PctO').value = 75")
     pg.evaluate("calculateRetirementPlan('house')")
     ev = pg.evaluate("""() => { const d = HH.spouse.currentAge - HH.me.currentAge; return { d: d, me: HH.prof.me.events.map(e => [e.name, e.amount, e.age]), sp: HH.prof.sp.events.map(e => [e.name, e.amount, e.age]),
         rme: HH.prof.me.recurringEvents.map(e => [e.amount, e.startAge, e.endAge]), rsp: HH.prof.sp.recurringEvents.map(e => [e.amount, e.startAge, e.endAge]) }; }""")
