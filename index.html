@@ -5922,6 +5922,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
             + '<div id="expList"></div>'
             + '<button type="button" class="secondary" onclick="expAddRow()">+ Add an expense</button>'
+            + '<details class="more"><summary>Paste a list</summary><textarea id="expPaste" rows="6" placeholder="One expense per line, name then amount"></textarea><button type="button" class="secondary" onclick="expPasteRows()">Add pasted rows</button><div class="exp-rec" id="expPasteMsg"></div></details>'
             + '<div class="exp-tot"><span id="expTotLbl">Total per month</span><b id="expTotal">$0</b></div>'
             + '<div class="exp-err" id="expErr" hidden>Add at least one expense with an amount, or tap Cancel.</div>'
             + '<div class="exp-btns"><button type="button" onclick="expCommit()">Use this list</button><button type="button" class="secondary" onclick="expCancel()">Cancel</button>'
@@ -5945,6 +5946,20 @@ The numbers in that example are placeholders from a prior year — replace every
     function expCancel() { expDraft = null; closeExp(); }
     function expToEvents() { closeExp(); showStep(7); }   // the draft is kept, so reopening the list shows it again
     function expFreqChange() { expDraft.freq = document.getElementById('expFreq').value === 'weekly' ? 'weekly' : 'monthly'; expUpdateTotal(); }
+    // Paste a list (one "name amount" per line, e.g. copied from a spreadsheet): adds a row per line with a positive amount.
+    function expPasteRows() {
+        const box = document.getElementById('expPaste'), msg = document.getElementById('expPasteMsg'); let added = 0, skipped = 0;
+        String(box.value || '').split(/\r?\n/).forEach(line => {
+            const t = line.replace(/CA\$|\$/g, '').replace(/\u00a0/g, ' ').trim(); if (!t) return;
+            const m = t.match(/^(.*?)[\s]+(\d[\d,]*(?:\.\d+)?)$/);
+            const amt = m ? parseFloat(m[2].replace(/,/g, '')) : NaN, name = m ? m[1].trim() : '';
+            if (!name || !(amt > 0)) { skipped++; return; }
+            expDraft.items.push({ name: name.charAt(0).toUpperCase() + name.slice(1), amount: String(amt) }); added++;
+        });
+        expDraft.items = expDraft.items.filter(i => String(i.name).trim() || parseFloat(i.amount) > 0);
+        box.value = ''; expRender(); expUpdateTotal();
+        msg.textContent = added ? 'Added ' + added + ' expense' + (added === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' line' + (skipped === 1 ? '' : 's') + ' skipped: no name or a zero amount).' : '.') : 'Nothing added. Use one line per expense: the name, then the amount.';
+    }
     function expAddRow() { expDraft.items.push({ name: '', amount: '' }); expRender(); const r = document.querySelectorAll('#expList .en'); if (r.length) r[r.length - 1].focus(); }
     function expRender() {
         const list = document.getElementById('expList'); list.innerHTML = '';

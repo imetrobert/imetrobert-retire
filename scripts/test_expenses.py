@@ -59,6 +59,15 @@ with sync_playwright() as pw:
         for w in ('Vos dépenses', 'Utiliser cette liste', 'Ajouter une dépense', 'Total par mois'):
             check(w in txt, 'French missing: ' + w)
         check('Vos dépenses totalisent' in txt and 'par mois' in txt, 'French lock text: ' + txt[-200:])
+    # paste a list: tab or space separated, $ and CA$ and thousands commas, zero and total lines skipped
+    pg.evaluate("openExpenses(); expDraft.items = []; expRender()")
+    pg.evaluate("document.getElementById('expPaste').closest('details').open = true")
+    pg.fill('#expPaste', "Alpha bus\t10.00 $\nBeta\tCA$5.25\nGamma food\t1,500.00 $\nZero item\t0.00 $\n\t1,515.25 $\n")
+    pg.evaluate("expPasteRows()")
+    got = pg.evaluate("expDraft.items.map(i => [i.name, i.amount])")
+    check(got == [['Alpha bus', '10'], ['Beta', '5.25'], ['Gamma food', '1500']], 'pasted rows: %s' % got)
+    check('Added 3 expenses' in pg.inner_text('#expPasteMsg'), 'paste message: ' + pg.inner_text('#expPasteMsg'))
+    pg.evaluate("expCancel()")
     check(not errs, 'page errors: %s' % errs[:2])
     br.close()
 if bad:
