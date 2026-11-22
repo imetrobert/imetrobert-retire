@@ -77,3 +77,10 @@ The same change usually belongs in the other planner's `account.js` too.
   `python3 scripts/test_statements.py` (needs `pip install playwright reportlab`).
 - Screenshots and scans are NOT read (no OCR yet); the message asks for the PDF.
 
+
+## 12. The tax check (scripts/test_tax.py) went red
+It compares the planner's tax engine and yearly plan with a SEPARATE calculation using its own copy of the official numbers
+(the "2026 PARAMETERS" block at the top of the script). The Actions run prints lines starting FAIL.
+- You just changed tax numbers (new year, or an edit in `getDefaultTaxRules`): update the PARAMETERS block to the same official figures. Two copies on purpose: if they disagree, one has a typo. Find which by checking the official table (canada.ca, Revenu Québec or Ontario), not by copying one into the other.
+- You did not touch tax numbers: a code change broke a calculation. Revert it or fix it, then run `python3 scripts/test_tax.py`.
+- The check does not block the site (Pages deploys on its own); it only alerts you.
