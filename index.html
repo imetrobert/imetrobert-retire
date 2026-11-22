@@ -2619,6 +2619,7 @@ The numbers in that example are placeholders from a prior year — replace every
             document.getElementById('event' + n + 'Amount').value = e.amount || 0;
             document.getElementById('event' + n + 'Age').value = e.age || '';
             document.getElementById('event' + n + 'Month').value = e.month || 1;
+            hhSetPct('event' + n + 'Pct', e.pct);
         }
     }
 
@@ -2629,7 +2630,8 @@ The numbers in that example are placeholders from a prior year — replace every
                 name: document.getElementById('event' + n + 'Name').value.trim(),
                 amount: parseFloat(document.getElementById('event' + n + 'Amount').value) || 0,
                 age: parseFloat(document.getElementById('event' + n + 'Age').value) || 0,
-                month: parseFloat(document.getElementById('event' + n + 'Month').value) || 1
+                month: parseFloat(document.getElementById('event' + n + 'Month').value) || 1,
+                pct: hhPctVal('event' + n + 'Pct')
             });
         }
         return events;
@@ -2640,6 +2642,7 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('event' + n + 'Amount').value = 0;
         document.getElementById('event' + n + 'Age').value = '';
         document.getElementById('event' + n + 'Month').value = 1;
+        hhSetPct('event' + n + 'Pct', null);
     }
 
     // Recurring events: same idea as one-time events, but active for every
@@ -2652,6 +2655,7 @@ The numbers in that example are placeholders from a prior year — replace every
             document.getElementById('recur' + n + 'StartAge').value = e.startAge || '';
             document.getElementById('recur' + n + 'EndAge').value = e.endAge || '';
             document.getElementById('recur' + n + 'Month').value = e.month || 1;
+            hhSetPct('recur' + n + 'Pct', e.pct);
         }
     }
 
@@ -2667,7 +2671,8 @@ The numbers in that example are placeholders from a prior year — replace every
                 name: document.getElementById('recur' + n + 'Name').value.trim(),
                 amount: parseFloat(document.getElementById('recur' + n + 'Amount').value) || 0,
                 startAge, endAge,
-                month: parseFloat(document.getElementById('recur' + n + 'Month').value) || 1
+                month: parseFloat(document.getElementById('recur' + n + 'Month').value) || 1,
+                pct: hhPctVal('recur' + n + 'Pct')
             });
         }
         return events;
@@ -2679,6 +2684,7 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('recur' + n + 'StartAge').value = '';
         document.getElementById('recur' + n + 'EndAge').value = '';
         document.getElementById('recur' + n + 'Month').value = 1;
+        hhSetPct('recur' + n + 'Pct', null);
     }
 
     function toggleSpouseMode() {   // the old joint-entry blocks stay hidden: a spouse now fills in their own full form (household mode)
@@ -5412,6 +5418,44 @@ The numbers in that example are placeholders from a prior year — replace every
 
 
     // ---- Information pop-ups: long notes become a small "More info" button that opens a bottom sheet ----
+    // ---- Household mode: who pays each life event (blank = the person filling in this form pays all) ----
+    function hhPctVal(id) { const el = document.getElementById(id); if (!el || el.value === '') return null; const v = parseFloat(el.value); return isFinite(v) ? Math.min(100, Math.max(0, v)) : null; }
+    function hhSetPct(id, v) { const el = document.getElementById(id); if (el) el.value = (v === null || v === undefined || v === '') ? '' : v; }
+    function hhEnsureEventPct() {
+        [['event', 'Amount'], ['recur', 'Amount']].forEach(k => {
+            for (let n = 1; n <= 10; n++) {
+                if (document.getElementById(k[0] + n + 'Pct')) continue;
+                const amt = document.getElementById(k[0] + n + k[1]), card = amt && amt.closest('.asset-row'); if (!card) continue;
+                const d = document.createElement('div'); d.className = 'hh-evpct'; d.hidden = true;
+                d.innerHTML = '<label for="' + k[0] + n + 'Pct">Share you pay (%)</label><input type="number" id="' + k[0] + n + 'Pct" min="0" max="100" step="any" placeholder="Blank = you pay all">';
+                card.appendChild(d);
+            }
+        });
+        const st = document.querySelector('.question-step[data-step="7"]');
+        if (st && !document.getElementById('hhEvNote')) {
+            const nt = document.createElement('span'); nt.className = 'note-text hh-evpct'; nt.id = 'hhEvNote'; nt.hidden = true;
+            nt.textContent = 'Household: for each event, enter the % you pay. Leave it blank and you pay all of it; the rest is paid by your spouse in the same year.';
+            const head = st.querySelector('.step-head'); if (head) head.insertAdjacentElement('afterend', nt); else st.insertBefore(nt, st.firstChild);
+        }
+    }
+    function hhShareEvents(A, B) {   // returns {a: {events, recurringEvents}, b: {...}}: each event split between the two plans
+        const dB = Math.round((B.currentAge || 0) - (A.currentAge || 0));
+        const pc = e => (e.pct === null || e.pct === undefined || e.pct === '' || !isFinite(parseFloat(e.pct))) ? 100 : Math.min(100, Math.max(0, parseFloat(e.pct)));
+        const out = { a: { events: [], recurringEvents: [] }, b: { events: [], recurringEvents: [] } };
+        const go = (src, dstOwn, dstOther, shift, key) => (src[key] || []).forEach(e => {
+            if (!(e && e.amount > 0)) return;
+            const mine = Math.round(e.amount * pc(e)) / 100, rest = Math.round((e.amount - mine) * 100) / 100;
+            if (mine > 0) dstOwn[key].push(Object.assign({}, e, { amount: mine }));
+            if (rest > 0) {
+                const o = Object.assign({}, e, { amount: rest });
+                if (key === 'events') o.age = e.age + shift; else { o.startAge = e.startAge + shift; o.endAge = e.endAge + shift; }
+                dstOther[key].push(o);
+            }
+        });
+        ['events', 'recurringEvents'].forEach(key => { go(A, out.a, out.b, dB, key); go(B, out.b, out.a, -dB, key); });
+        return out;
+    }
+    hhEnsureEventPct();
     // ---- Household mode: you and a spouse each fill in the SAME form separately; results merge them ----
     // HH.me / HH.spouse hold each person's full profile. The form shows one of them (HH.who). Household settings
     // (spending, inflation, returns) live in HH.me and are greyed out in the spouse's view. Each person's plan runs as a
@@ -5502,6 +5546,7 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('hhNote2').textContent = HH.legacy ? 'Your spouse\'s form was built from your earlier joint entries. Please review it.' : '';
         document.getElementById('hhNote3').textContent = HH.legacy === 'pension' ? 'An employer pension for your spouse was not carried over: enter it in their form.' : '';
         const nr = document.getElementById('hhNamesRow'); if (nr) nr.hidden = !couple;
+        document.querySelectorAll('.hh-evpct').forEach(d => { d.hidden = !couple; });
         ['hhTabsMe', 'hhTabsSp'].forEach((id, i) => { const b = document.getElementById(id); if (b) b.textContent = hhLabel(i ? 'sp' : 'me'); });
         HH_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = sp; });
         if (!sp && typeof expSync === 'function') expSync();
@@ -5546,7 +5591,10 @@ The numbers in that example are placeholders from a prior year — replace every
         let pct = opts.pct != null ? opts.pct : (HH.expShare != null ? HH.expShare : (HH.split !== '' && HH.split != null ? Math.min(99, Math.max(1, parseFloat(HH.split) || HH.shareAuto)) : HH.shareAuto));
         HH.shareMe = pct;
         const total = opts.total != null ? opts.total : me.spendAmount, freq = opts.freq || me.spendFrequency;
-        return { me: hhMk(me, pct, total, freq, 'You'), sp: hhMk(sp, 100 - pct, total, freq, 'Your spouse') };
+        const out = { me: hhMk(me, pct, total, freq, 'You'), sp: hhMk(sp, 100 - pct, total, freq, 'Your spouse') };
+        const ev = hhShareEvents(me, sp);
+        out.me.events = ev.a.events; out.me.recurringEvents = ev.a.recurringEvents; out.sp.events = ev.b.events; out.sp.recurringEvents = ev.b.recurringEvents;
+        return out;
     }
     function hhPlanFor(p, rules) {
         const ch = hhChooseAges(p, rules);
@@ -5640,7 +5688,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<div class="hh-card"><small>Savings left at the end</small><b>' + fmt(endTot) + '</b><span>both of you</span></div></div>'
             + '<h3 class="section-title">Year by year, household view</h3>'
             + '<div class="hh-tablewrap"><table class="hh-table"><thead><tr><th>Year</th><th>Ages</th><th>Spending need</th><th>Take-home</th><th>Tax</th><th><span>' + nm + '</span><br><small>takes out</small></th><th><span>' + ns + '</span><br><small>takes out</small></th><th>Savings left</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Pension income splitting and spousal rollover are not modeled. Life events are paid from the account of whoever entered them. Tap the You or Your spouse tab above for a full plan for one person.</span>';
+            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Pension income splitting and spousal rollover are not modeled. Each life event is split by the % entered on it (blank means the person who entered it pays all). Tap the You or Your spouse tab above for a full plan for one person.</span>';
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     // Recommend the split of household spending that gives the best combined result (same scoring the optimizer uses).
