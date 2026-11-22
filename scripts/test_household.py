@@ -118,6 +118,27 @@ with sync_playwright() as pw:
     check(pg.evaluate("HH.spouse.currentAge") == 58 and pg.evaluate("HH.spouse.currentTfsa") == 30000 and pg.evaluate("HH.legacy") != '', 'legacy joint profile migrates')
     # back to single
     pg.evaluate("populateForm({calcMode:'single'})"); check(pg.evaluate("document.getElementById('hhBar').hidden"), 'single mode hides the bar')
+    # spousal rollover: the first death passes savings to the survivor tax-free; the survivor then covers a reduced share of spending
+    pg.evaluate("populateForm({calcMode:'couple', currentAge:66, targetAge:66, alreadyRetired:true, spendAmount:8000, spendFrequency:'monthly', currentRrsp:900000, lifeExpectancy:80, hhNames:{me:'Robert',sp:'Dana'}})")
+    pg.evaluate("hhSwitch('spouse')")
+    pg.evaluate("document.getElementById('currentAge').value = 64; document.getElementById('targetAge').value = 64; document.getElementById('currentRrsp').value = 300000; document.getElementById('currentTfsa').value = 60000; document.getElementById('lifeExpectancy').value = 96")
+    pg.evaluate("hhSwitch('me')")
+    pg.evaluate("calculateRetirementPlan('house')")
+    rl = pg.evaluate("""() => { const i = HH.rollInfo; if (!i) return null; const S = HH.plans.sp, D = HH.plans.me, r = S.run.scheduleRows, k = i.year - new Date().getFullYear() + 1;
+        return { dead: i.dead, amount: i.amount, deadTax: D.run.taxAtDeath.taxAtDeath, flag: !!D.p.hhRollover,
+                 jump: (r[k].oRrsp + r[k].oRlif + r[k].oLira + r[k].oNon + r[k].oFtq + r[k].oTfsa) - hhBal(r[k - 1]),
+                 spend: r[k].targetSpend / (getAnnualNetNeed(HH.me) * r[k].inflationIndex), pct: i.pct, n: [HH.plans.me.run.scheduleRows.length, r.length] }; }""")
+    check(rl is not None and rl['dead'] == 'me' and rl['amount'] > 50000, 'rollover: first death found, savings pass on: %s' % rl)
+    if rl:
+        check(rl['deadTax'] == 0 and rl['flag'], 'no tax at the first death (rollover): %s' % rl)
+        check(rl['jump'] > 0.5 * rl['amount'], 'survivor receives the savings: %s' % rl)
+        check(abs(rl['spend'] - 0.75) < 0.02, 'survivor covers 75%% of household spending: %s' % rl)
+    check('First death' in pg.inner_text('#hhPanel'), 'grid shows the first-death card')
+    pg.evaluate("document.getElementById('hhSurvIn').value = 100; hhSetRoll()")
+    check(pg.evaluate("HH.survPct") == 100 and pg.evaluate("getProfileData().hhSurvPct") == 100, 'survivor spending % is saved')
+    pg.evaluate("document.getElementById('hhRollChk').click()")
+    off = pg.evaluate("() => [HH.rollInfo, HH.plans.me.run.taxAtDeath.taxAtDeath, getProfileData().hhRoll]")
+    check(off[0] is None and off[1] > 0 and off[2] == 'off', 'rollover switched off: estate tax returns: %s' % off)
     # French
     if pg.evaluate("!!(window.QCRP_I18N && QCRP_I18N.toggle)"):
         pg.evaluate("p => populateForm(p)", p2); pg.evaluate("calculateRetirementPlan('house')")
