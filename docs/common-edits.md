@@ -84,3 +84,8 @@ It compares the planner's tax engine and yearly plan with a SEPARATE calculation
 - You just changed tax numbers (new year, or an edit in `getDefaultTaxRules`): update the PARAMETERS block to the same official figures. Two copies on purpose: if they disagree, one has a typo. Find which by checking the official table (canada.ca, Revenu Québec or Ontario), not by copying one into the other.
 - You did not touch tax numbers: a code change broke a calculation. Revert it or fix it, then run `python3 scripts/test_tax.py`.
 - The check does not block the site (Pages deploys on its own); it only alerts you.
+
+## 13. The optional expense list (Step 2 spending)
+Under the spending field a link opens "Your expenses": a list of name + amount, monthly or weekly (default monthly). "Use this list" fills `spendAmount` and `spendFrequency` with the total and greys both out; "Edit expense list" or "Stop using the list" are the only ways to change them. Code: the block that starts `// ---- Optional expense list` in `index.html` (`EXP`, `expSync`, `openExpenses`, `expCommit`, `expStop`). It is saved with the plan as `expenseOn`, `expenseFreq`, `expenseItems` (read in `populateForm` via `expLoad`, written in `getProfileData`). The plan itself still just reads `spendAmount` and `spendFrequency`, so nothing else changes.
+- Wording: edit the strings inside `buildExpSheet()` and the three lines under `spendFrequencyNote` and add the French to the `Object.assign(EXACT, {...})` block right after `P.push(["· not adding"...` (and the two `Your expenses add up to` patterns).
+- Test: `python3 scripts/test_expenses.py` (runs in Checks).
