@@ -51,7 +51,7 @@
       badPass: 'Wrong passphrase, or a saved plan was damaged.', working: 'Working…', saved: 'Saved to your account.', unlocked: 'Unlocked.',
       deleted: 'Deleted.', opened: 'Plan opened in the form.', confirmDel: 'Delete this saved plan? This cannot be undone.',
       noCrypto: 'This browser cannot encrypt here. Open the page over https in a current browser.', saveFail: 'Could not save. Check your connection and try again.',
-      soTitle: 'Sign out', soText: 'Do you also want to remove plans stored on this device?', soKeep: 'Sign out, keep device plans', soClear: 'Sign out and clear device plans', cancel: 'Cancel',
+      soTitle: 'Sign out', soText: 'Your Saved on this device copies and the plan in the form can stay on this phone, or be removed. Plans in My plans (cloud) are never affected.', soSure: 'Tap again to delete the device copies', soKeep: 'Sign out, keep device plans', soClear: 'Sign out and clear device plans', cancel: 'Cancel',
       welcome: 'Welcome {email} to your retirement planner', docsLink: 'Read the documentation',
       loggedIn: 'Logged in as {email}', docsMenu: 'Documentation', docsSub: 'User guide (PDF)', plansSub: 'Encrypted in your account, opens on any device',
       lang: 'Français'
@@ -72,7 +72,7 @@
       badPass: 'Phrase secrète incorrecte, ou un plan enregistré est endommagé.', working: 'En cours…', saved: 'Enregistré dans votre compte.', unlocked: 'Déverrouillé.',
       deleted: 'Supprimé.', opened: 'Plan ouvert dans le formulaire.', confirmDel: 'Supprimer ce plan enregistré ? Cette action est irréversible.',
       noCrypto: 'Ce navigateur ne peut pas chiffrer ici. Ouvrez la page en https dans un navigateur récent.', saveFail: 'Enregistrement impossible. Vérifiez votre connexion et réessayez.',
-      soTitle: 'Se déconnecter', soText: 'Voulez-vous aussi supprimer les plans conservés sur cet appareil ?', soKeep: 'Se déconnecter, garder les plans de l’appareil', soClear: 'Se déconnecter et effacer les plans de l’appareil', cancel: 'Annuler',
+      soTitle: 'Se déconnecter', soText: 'Vos copies Enregistrées sur cet appareil et le plan du formulaire peuvent rester sur ce téléphone, ou être supprimés. Les plans de Mes plans (nuage) ne sont jamais touchés.', soSure: 'Touchez encore pour supprimer les copies de l’appareil', soKeep: 'Se déconnecter, garder les plans de l’appareil', soClear: 'Se déconnecter et effacer les plans de l’appareil', cancel: 'Annuler',
       welcome: 'Bienvenue {email} dans votre planificateur de retraite', docsLink: 'Lire la documentation',
       loggedIn: 'Connecté en tant que {email}', docsMenu: 'Documentation', docsSub: 'Guide de l’utilisateur (PDF)', plansSub: 'Chiffrés dans votre compte, accessibles sur tout appareil',
       lang: 'English'
@@ -332,10 +332,11 @@
       location.reload();
     }
     var panel = el('div', { id: 'awr-panel' }, [el('div', { class: 'awr-card' }, [el('h2', {}, [t('soTitle')]), el('p', {}, [t('soText')]),
-      el('button', { class: 'awr-btn', type: 'button', onclick: function () { finish(false); } }, [t('soKeep')]),
-      el('button', { class: 'awr-btn bad', type: 'button', onclick: function () { finish(true); } }, [t('soClear')]),
+      el('button', { id: 'awr-so-keep', class: 'awr-btn', type: 'button', onclick: function () { finish(false); } }, [t('soKeep')]),
+      el('button', { id: 'awr-so-clear', class: 'awr-btn sec', type: 'button', onclick: function (e) { var b = e.currentTarget; if (b.getAttribute('data-sure')) { finish(true); return; } b.setAttribute('data-sure', '1'); b.className = 'awr-btn bad'; b.textContent = t('soSure'); } }, [t('soClear')]),
       el('button', { class: 'awr-btn sec', type: 'button', onclick: function () { panel.remove(); } }, [t('cancel')])])]);
     document.body.appendChild(panel);
+    var kb = document.getElementById('awr-so-keep'); if (kb) kb.focus();
   }
 
   function welcome() {
