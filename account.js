@@ -20,6 +20,8 @@
     key: 'sb_publishable_oPa7fZdSTeXKuCwpOF338Q_PcXS57go',
     app: 'retire-personal',
     name: 'Personal Retirement Planner',
+    siteUrl: 'https://retire.imetrobert.com',   // shown in the "request access" email
+    requestAccess: false,   // false = no "request access" line on the sign-in screen (private app)
     storageKey: 'awr_retirepersonal_auth',
     lsPrefix: 'csl',       // the planner's own localStorage prefix
     profileKey: 'csl_retire_profile_v2026',    // the planner's current-plan key
@@ -34,6 +36,7 @@
   /* ---------- text ---------- */
   var T = {
     en: {
+      reqA: 'Need an account or access? Email ', reqB: ' and Robert will send you a link to register.', reqSubject: 'Access request: ', reqBody1: 'Hi Robert,\n\nI would like an account or access to ', reqBody2: '.\n\nMy name: \nMy email address: \n\nThank you',
       title: 'Sign in', sub: 'Access is by invitation. Use the email and password you set from your invitation.',
       email: 'Email', password: 'Password', signIn: 'Sign in', signingIn: 'Signing in…', signOut: 'Sign out',
       wrong: 'That email or password is not right.', noaccess: 'This account does not have access to this planner. Ask Robert to grant it.',
@@ -54,6 +57,7 @@
       lang: 'Français'
     },
     fr: {
+      reqA: 'Besoin d’un compte ou d’un accès? Écrivez à ', reqB: ' et Robert vous enverra un lien pour vous inscrire.', reqSubject: 'Demande d’accès : ', reqBody1: 'Bonjour Robert,\n\nJe voudrais un compte ou un accès à ', reqBody2: '.\n\nMon nom : \nMon adresse courriel : \n\nMerci',
       title: 'Connexion', sub: 'L’accès se fait sur invitation. Utilisez le courriel et le mot de passe définis depuis votre invitation.',
       email: 'Courriel', password: 'Mot de passe', signIn: 'Se connecter', signingIn: 'Connexion…', signOut: 'Se déconnecter',
       wrong: 'Ce courriel ou ce mot de passe n’est pas correct.', noaccess: 'Ce compte n’a pas accès à ce planificateur. Demandez à Robert de l’autoriser.',
@@ -92,6 +96,7 @@
   /* ---------- styles ---------- */
   var css = '#awr-gate,#awr-panel{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.72);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}' +
     '#awr-gate{background:#f1f5f9}' +
+    '.awr-req{font-size:13px!important;color:#64748b!important}.awr-req a{color:#2563eb}' +
     '.awr-card{background:#fff;color:#0f172a;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);width:100%;max-width:440px;max-height:92vh;overflow:auto;padding:22px;box-sizing:border-box}' +
     '.awr-card h2{margin:0 0 6px;font-size:20px}.awr-card h3{margin:18px 0 6px;font-size:15px}.awr-card p{margin:6px 0;font-size:14px;line-height:1.45;color:#334155}' +
     '.awr-card label{display:block;margin:12px 0 4px;font-size:13px;font-weight:600}' +
@@ -237,6 +242,10 @@
       });
     } }, [el('label', { for: 'awr-email' }, [t('email')]), email, el('label', { for: 'awr-pw' }, [t('password')]), pw, btn, msg]);
     var kids = [el('h2', {}, [CFG.name]), el('h3', {}, [t('title')]), el('p', {}, [t('sub')]), form];
+    if (CFG.requestAccess !== false && CFG.siteUrl) {
+      var reqHref = 'mailto:robert@imetrobert.com?subject=' + encodeURIComponent(t('reqSubject') + CFG.name) + '&body=' + encodeURIComponent(t('reqBody1') + CFG.name + ' (' + CFG.siteUrl + ')' + t('reqBody2'));
+      kids.push(el('p', { class: 'awr-req' }, [t('reqA'), el('a', { href: reqHref }, ['robert@imetrobert.com']), t('reqB')]));
+    }
     if (CFG.fr) kids.push(el('button', { class: 'awr-link', type: 'button', onclick: function () { try { localStorage.setItem(CFG.langKey, lang() === 'fr' ? 'en' : 'fr'); } catch (e) {} showGate(msgKey); } }, [t('lang')]));
     g = el('div', { id: 'awr-gate' }, [el('div', { class: 'awr-card' }, kids)]);
     document.body.appendChild(g);
