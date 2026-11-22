@@ -28,3 +28,10 @@ Access is only for Robert (access.imetrobert.com, app id `retire-personal`; neve
 planner" and a "My plans" button; each saved plan is encrypted in the browser with the user's own passphrase
 (unrecoverable if forgotten). One-time setup: run `migration/planner_profiles.sql` via the Supabase AI assistant
 (the file lives in the Quebec repo, `aiwithrobert-retireqc`).
+
+## Working on this with the free version of Claude
+The file is large, so free Claude must not read it whole. Start a chat with this message and attach nothing else:
+
+> Open `CLAUDE.md` and `docs/common-edits.md` in the repo imetrobert/imetrobert-retire. I want to: <one change>. Follow the recipe, edit only the lines it names (use grep, never read index.html whole), run `python3 scripts/check_planner.py`, and tell me what to commit.
+
+Tips: ask for ONE change per chat; use the GitHub web editor (pencil icon) for copy changes; the Checks tab on GitHub must be green after each push; `docs/code-map.md` gives line numbers so only a small slice is read.
