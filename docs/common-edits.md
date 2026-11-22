@@ -67,6 +67,7 @@ The same change usually belongs in the other planner's `account.js` too.
   retirement pension (monthly)": two rows, "continue contributing" / "stopped today", amounts at age 60 and 65)
   and fills `qppMonthlyAmt` (or `spouseQppMonthlyAmt`) after a Preview and a tap on Apply. Layout source: the
   public example on retraitequebec.gouv.qc.ca ("Statement of Participation under the QPP").
+- Also reads a public-sector pension statement (RREGOP and similar; `parsePublic()`): three yearly scenarios (earliest possible, earliest unreduced, at 65), fills `ownPensionAnnual` and `ownPensionStartAge` and sets `pensionType` to a DB option. Skipped automatically in planners without `#ownPensionAnnual`. Layout source: Retraite Québec's public example PDF; the amount positions there were not visible to me, so it is the least verified reader.
 - If Retraite Québec changes wording: edit `START_RX`, `END_RX`, `KIND_CONT`, `KIND_STOP` at the top of the
   QPP block in `statements.js`. Unknown layouts still work through the "Pick the number yourself" list.
 - New statement type (OAS, CPP, a tax slip): copy `parseQpp()` into `parseXxx()`, add its fixture to

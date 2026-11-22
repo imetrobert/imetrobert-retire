@@ -47,7 +47,15 @@
             pickNone: 'No dollar amounts were found.',
             page: 'page',
             privacy: 'Privacy: the file never leaves this page. Always check the number against your statement before relying on it.',
-            needSpouse: 'Switch “Who is this plan for?” to couple mode to apply a spouse statement.'
+            needSpouse: 'Switch “Who is this plan for?” to couple mode to apply a spouse statement.',
+            pubFound: 'Found: public-sector pension statement (RREGOP and similar). Yearly pension estimates. Tick the one to use.',
+            pubEarly: 'At the earliest possible retirement date',
+            pubUnred: 'At the earliest date for an unreduced pension',
+            pub65: 'At age 65',
+            pubUntil: 'payable until 65', pubFrom: 'payable from 65', pubYear: '/ year',
+            pubWill: 'Will set “Pension per year” and “Starts at age” in your employer pension (yours only)',
+            pubSpouse: 'Spouse pension statements cannot be applied yet. Use “me”, or enter the spouse figures by hand.',
+            pubIdx: 'Check “Rises with inflation (%)” yourself: your statement’s Information Sheet gives the indexation.'
         },
         fr: {
             sum: 'Lire un relevé gouvernemental (Retraite Québec)',
@@ -74,7 +82,15 @@
             pickNone: 'Aucun montant en dollars trouvé.',
             page: 'page',
             privacy: 'Confidentialité : le fichier ne quitte jamais cette page. Vérifiez toujours le montant avec votre relevé avant de vous y fier.',
-            needSpouse: 'Passez « Planification pour » en mode couple pour appliquer le relevé d’un(e) conjoint(e).'
+            needSpouse: 'Passez « Planification pour » en mode couple pour appliquer le relevé d’un(e) conjoint(e).',
+            pubFound: 'Trouvé : relevé de participation à un régime de retraite du secteur public (RREGOP et autres). Rentes annuelles estimées. Cochez celle à utiliser.',
+            pubEarly: 'À la date de retraite la plus rapprochée',
+            pubUnred: 'À la première date d’une rente sans réduction',
+            pub65: 'À 65 ans',
+            pubUntil: 'payable jusqu’à 65 ans', pubFrom: 'payable dès 65 ans', pubYear: '/ an',
+            pubWill: 'Remplira « Pension par année » et « Commence à l’âge de » dans votre pension d’employeur (la vôtre seulement)',
+            pubSpouse: 'Les relevés de pension d’un(e) conjoint(e) ne peuvent pas encore être appliqués. Choisissez « moi » ou entrez les chiffres à la main.',
+            pubIdx: 'Vérifiez vous-même « Indexation (%) » : la feuille d’information de votre relevé donne l’indexation.'
         }
     };
     function t(k) { return (isFr() ? TXT.fr : TXT.en)[k]; }
@@ -156,6 +172,12 @@
         return (n >= 55 && n <= 75) ? n : null;
     }
 
+    function ageIn(s) {   // "Age 61", "61 ans", also inside longer text
+        var m = /\b(?:age|a)\s*(\d{2})\b|\b(\d{2})\s*ans\b/.exec(norm(s));
+        var n = m ? parseInt(m[1] || m[2], 10) : NaN;
+        return (n >= 50 && n <= 75) ? n : null;
+    }
+
     /* ---------- QPP statement, section A ---------- */
     var START_RX = /estimate of the amount of your retirement pension|estimation du montant de (?:votre|la) rente de retraite|montant de votre rente de retraite/;
     var END_RX = /pensionable earnings|revenus de travail admissibles|in the event of disability|en cas d.invalidite|your benefits are calculated|vos prestations sont calculees/;
@@ -208,6 +230,58 @@
                     return { age: near ? near.age : defaults[i], value: a.v, guessedAge: !near, page: pages[pi].page };
                 });
                 res.rows.push({ kind: kind, amounts: list });
+            });
+            res.recognised = res.rows.length > 0;
+            break;
+        }
+        return res;
+    }
+
+
+    /* ---------- public-sector pension statement (RREGOP and similar): yearly estimates by scenario ---------- */
+    var PUB_SCEN = [
+        { id: 'early', rx: /earliest possible|plus tot possible|plus rapprochee/, tx: 'pubEarly' },
+        { id: 'unreduced', rx: /unreduced|sans reduction/, tx: 'pubUnred' },
+        { id: 'age65', rx: /^at age 65|^a 65 ans/, tx: 'pub65' }
+    ];
+    var PUB_UNTIL = /payable until age 65|payable jusqu/, PUB_FROM = /payable as of age 65|payable des 65|payable a compter/;
+    var MIN_YEARLY = 1000, MAX_YEARLY = 400000;
+
+    function parsePublic(pages) {
+        var res = { recognised: false, rows: [] };
+        for (var pi = 0; pi < pages.length; pi++) {
+            var toks = pages[pi].tokens, labs = [];
+            toks.forEach(function (k) {
+                var n = norm(k.s);
+                for (var i = 0; i < PUB_SCEN.length; i++) {
+                    if (PUB_SCEN[i].rx.test(n) && !PUB_UNTIL.test(n) && !PUB_FROM.test(n)) {
+                        if (!labs.some(function (l) { return l.id === PUB_SCEN[i].id; })) labs.push({ id: PUB_SCEN[i].id, tx: PUB_SCEN[i].tx, x: k.x, y: k.y });
+                        break;
+                    }
+                }
+            });
+            if (labs.length < 2) continue;
+            labs.sort(function (a, b) { return b.y - a.y; });
+            var hUntil = null, hFrom = null;
+            toks.forEach(function (k) { var n = norm(k.s); if (PUB_UNTIL.test(n)) hUntil = k; else if (PUB_FROM.test(n)) hFrom = k; });
+            labs.forEach(function (l, i) {
+                var top = l.y + 14, bottom = (i + 1 < labs.length) ? labs[i + 1].y + 14 : l.y - 90;
+                var found = [], age = null;
+                toks.forEach(function (k) {
+                    if (k.y > top || k.y <= bottom) return;
+                    var v = parseAmount(k.s);
+                    if (v !== null && v >= MIN_YEARLY && v <= MAX_YEARLY) found.push({ v: v, x: k.x + k.w / 2 });
+                    var a = ageOf(k.s) || ageIn(k.s); if (a && !age) age = a;
+                });
+                if (!found.length) return;
+                found.sort(function (a, b) { return a.x - b.x; });
+                var cols = found.map(function (f, ci) {
+                    var kind = 'plain';
+                    if (hUntil && hFrom) kind = Math.abs(f.x - (hUntil.x + hUntil.w / 2)) <= Math.abs(f.x - (hFrom.x + hFrom.w / 2)) ? 'until' : 'from';
+                    else if (found.length === 2) kind = ci === 0 ? 'until' : 'from';
+                    return { value: f.v, kind: kind };
+                });
+                res.rows.push({ id: l.id, tx: l.tx, age: l.id === 'age65' ? 65 : age, cols: cols });
             });
             res.recognised = res.rows.length > 0;
             break;
@@ -308,12 +382,54 @@
             });
             h += '</div>' + msg('note', t('only65'));
             h += applyBlock();
-        } else {
+        } else if (!(state.pub && state.pub.recognised && document.getElementById('ownPensionAnnual'))) {
             h += msg('bad', t('notFound'));
         }
+        h += pubBlock();
         h += pickList();
         out.innerHTML = h;
         wire(out);
+    }
+
+
+    function pubBlock() {
+        var pb = state.pub;
+        if (!pb || !pb.recognised || !document.getElementById('ownPensionAnnual')) return '';   // planners without a DB-pension card skip this
+        var h = msg('', t('pubFound')) + '<div class="ai-table">';
+        pb.rows.forEach(function (r, ri) {
+            h += '<div style="font-weight:600;margin:0.4rem 0 0.1rem">' + esc(t(r.tx)) + (r.age ? ' (' + esc(t('age')) + ' ' + r.age + ')' : '') + '</div>';
+            r.cols.forEach(function (c, ci) {
+                var lab = c.kind === 'until' ? t('pubUntil') : (c.kind === 'from' ? t('pubFrom') : '');
+                var def = r.id === 'age65' && c.kind !== 'until';
+                h += '<label class="ai-row"><input type="radio" name="stmtPubChoice" data-v="' + c.value + '" data-age="' + (r.age || '') + '"' + (def ? ' checked' : '') + '>' +
+                    '<span class="ai-lbl">' + esc(lab) + '</span><strong class="ai-new">' + esc(fmt(c.value)) + ' ' + esc(t('pubYear')) + '</strong></label>';
+            });
+        });
+        h += '</div>';
+        if (((state && state.forWho) || 'me') === 'spouse') return h + msg('bad', t('pubSpouse'));
+        return h + msg('', t('pubWill')) + msg('note', t('pubIdx')) +
+            '<div class="btn-row"><button type="button" class="save-btn" id="stmtApplyPub">' + esc(t('apply')) + '</button></div>';
+    }
+
+    function applyPublic(v, age) {
+        function put(id, val) {
+            var el = document.getElementById(id); if (!el) return false;
+            el.value = String(val);
+            el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        }
+        var pt = document.getElementById('pensionType');
+        if (pt && (pt.value === 'none' || pt.value === 'dc')) {
+            pt.value = pt.value === 'dc' ? 'both' : 'db';
+            pt.dispatchEvent(new Event('change', { bubbles: true }));
+            if (typeof window.syncPensionType === 'function') { try { window.syncPensionType(); } catch (e) { /* ignore */ } }
+        }
+        var ok = put('ownPensionAnnual', Math.round(v));
+        if (age) put('ownPensionStartAge', age);
+        if (typeof window.refreshCollapsibleSummaries === 'function') { try { window.refreshCollapsibleSummaries(); } catch (e) { /* ignore */ } }
+        var out = document.getElementById('stmtOut');
+        if (ok && out) out.insertAdjacentHTML('afterbegin', msg('good', t('applied') + ' ' + fmt(v) + ' ' + t('pubYear')));
+        return ok;
     }
 
     function applyBlock() {
@@ -327,7 +443,7 @@
 
     function pickList() {
         var picks = state.picks || [];
-        var h = '<details class="fold" id="stmtPickFold"' + ((state.parsed && state.parsed.recognised) ? '' : ' open') + '><summary>' + esc(t('pickTitle')) + '</summary><div class="fold-body">' +
+        var h = '<details class="fold" id="stmtPickFold"' + ((state.parsed && state.parsed.recognised) || (state.pub && state.pub.recognised) ? '' : ' open') + '><summary>' + esc(t('pickTitle')) + '</summary><div class="fold-body">' +
             '<p style="margin:0 0 0.4rem;font-size:0.85rem">' + esc(t('pickHelp')) + '</p>';
         if (!picks.length) h += msg('', t('pickNone'));
         picks.forEach(function (a, i) {
@@ -359,6 +475,12 @@
             if (!c) return;
             setValue(parseFloat(c.getAttribute('data-v')));
         });
+        var ap2 = document.getElementById('stmtApplyPub');
+        if (ap2) ap2.addEventListener('click', function () {
+            var c = out.querySelector('input[name=stmtPubChoice]:checked');
+            if (!c) return;
+            applyPublic(parseFloat(c.getAttribute('data-v')), parseInt(c.getAttribute('data-age'), 10) || 0);
+        });
         var btns = out.querySelectorAll('.stmtPickBtn');
         for (var i = 0; i < btns.length; i++) btns[i].addEventListener('click', function () { setValue(parseFloat(this.getAttribute('data-v'))); });
     }
@@ -378,6 +500,7 @@
                 var any = pages.some(function (p) { return p.tokens.length > 0; });
                 if (!any) { state.error = 'noText'; state.picks = []; renderResult(); return; }
                 state.parsed = parseQpp(pages);
+                state.pub = parsePublic(pages);
                 state.picks = allAmounts(pages);
                 renderResult();
             }).catch(function () { state.error = 'failed'; renderResult(); });
@@ -396,5 +519,5 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 
-    window.QCRP_STMT = { parseQpp: parseQpp, tokenize: tokenize, parseAmount: parseAmount, render: render };
+    window.QCRP_STMT = { parseQpp: parseQpp, parsePublic: parsePublic, tokenize: tokenize, parseAmount: parseAmount, render: render };
 })();
