@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
 AI MAP - read this first, then open only the line ranges you need (file is 400-500 KB: never read it whole; use grep -n or Read with offset/limit).
+Plain-language helpers: planSummaryHtml (results box), ACCT_HELP + cardSummary (Step 2 cards), applyReturnPreset (Step 3). See docs/common-edits.md.
 RETIREMENT PLANNER - PERSONAL (private, sign-in only; Bell-style DC pension + Manulife/Wealthsimple features) v31
 Single static file: HTML form (steps 1-3 inputs, step 4 results) + one <script>. No build step, no network calls. Runs offline; data saved in localStorage.
 LINE ANCHORS (approx., re-grep if stale): APP_VERSION:1921 | TFSA_ANNUAL_LIMIT:3751 | const MONEY_FIELDS:3449 | <style:26 | <script>:1915 | data-step="1":494 | data-step="2":538 | data-step="3":848 | data-step="4":926
@@ -435,6 +436,16 @@ details.tipbox>div{padding:0 12px 12px;font-size:14px;color:#1e293b}
 .yp>summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none}
 .yp>summary::-webkit-details-marker{display:none}
 .yp-age{flex:0 0 auto;min-width:46px;text-align:center;font-weight:800;font-size:20px;color:#1e3a8a;line-height:1}
+.hero .hero-note{margin-top:.5rem;font-size:.8rem;opacity:.95}
+.plan-sum{background:#fff;border:1px solid #dbe4f0;border-radius:14px;padding:12px 14px;margin:12px 0}
+.plan-sum h3{margin:0 0 8px;font-size:1rem;color:#1e3a8a}
+.ps-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eef2f7;font-size:.9rem}
+.ps-row span{color:#475569;flex:0 0 auto}.ps-row b{text-align:right;color:#0f172a}
+.ps-note{margin:8px 0 0;font-size:.85rem;color:#475569}
+.acct-help{font-size:.84rem;color:#475569;margin:2px 0 10px;line-height:1.4}
+.preset-row{display:flex;gap:6px;margin:6px 0 6px}
+.preset-row button{flex:1;padding:10px 4px;font-size:.78rem;line-height:1.25}
+.preset-row button.active{background:#1e3a8a;color:#fff;border-color:#1e3a8a}
 .yp-age small{display:block;font-size:10px;font-weight:600;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
 .yp-main{flex:1;min-width:0}
 .yp-main b{display:block;font-size:17px;color:#0f172a}
@@ -553,7 +564,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
         </div>
 
         <div class="question-step" data-step="2">
-            <div class="step-head"><div class="eyebrow">Step 2 of 3</div><h2>Your money</h2><p>Spending goal, accounts and pensions. Tap a card to open it.</p></div>
+            <div class="step-head"><div class="eyebrow">Step 2 of 3</div><h2>Your money</h2><p>Spending goal, accounts and pensions. Tap a card to open it. Amounts marked “example” are placeholders: replace them with yours, or set them to 0.</p></div>
             <div class="expand-all"><button type="button" class="link-btn" onclick="setAllCards(true)">Expand all</button><button type="button" class="link-btn" onclick="setAllCards(false)">Collapse all</button></div>
             <label for="spendFrequency">How often do you want paid?</label>
             <select id="spendFrequency" onchange="updateSpendFrequencyLabel()">
@@ -879,6 +890,13 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <div class="verify-banner" style="background:#f0fdf4; border-color:#bbf7d0; color:#14532d;">
                 <strong>Payout frequency (set on Step 2) affects growth too.</strong> Withdrawing weekly instead of monthly leaves money invested slightly longer on average between withdrawals, so it earns a bit more growth over the year — the post-retirement return below is applied accounting for whichever frequency you chose. The difference is usually small (a few tenths of a percent of the balance per year) but it's modeled exactly rather than assumed away.
             </div>
+            <label>Quick start: choose a set of return assumptions (until you retire / after you retire)</label>
+            <div class="preset-row" id="retPresets">
+                <button type="button" class="secondary" data-pre="4" data-post="3" onclick="applyReturnPreset(4, 3)">Cautious (4% / 3%)</button>
+                <button type="button" class="secondary" data-pre="6" data-post="4.5" onclick="applyReturnPreset(6, 4.5)">Balanced (6% / 4.5%)</button>
+                <button type="button" class="secondary" data-pre="7.5" data-post="5.5" onclick="applyReturnPreset(7.5, 5.5)">Optimistic (7.5% / 5.5%)</button>
+            </div>
+            <span class="note-text">These are examples to start from, not predictions. You can type your own numbers below.</span>
             <label for="returnPre">Yearly return until you retire (%)</label>
             <input type="number" id="returnPre" value="6.0" step="0.5">
 
@@ -962,24 +980,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <details class="tipbox resultnote"><summary>ⓘ More about this result</summary><div><div id="deficitReportBanner"></div>
             <div id="mcReportBanner"></div></div></details>
 
-            <h3 class="section-title">What to do each year</h3>
-            <div class="seg" role="group" aria-label="Schedule view">
-                <button type="button" class="seg-btn active" id="segCards" onclick="setScheduleView('cards')">Year plan</button>
-                <button type="button" class="seg-btn" id="segTable" onclick="setScheduleView('table')">Detailed table</button>
-            </div>
-            <div id="yearCards" class="year-cards"></div>
-            <div id="tableView" class="table-view" hidden>
-                <span class="note-text">Tap a withdrawal to see what it is for (Income, Event, Tax or Transfer), or use <strong>Expand all purposes</strong>. This table shows one representative path (flat/custom models) or the first Monte Carlo trial (for illustration only — see the success-rate summary above for the real range of outcomes under that model). Amounts in <strong>(parentheses)</strong> are money leaving an account — withdrawals, tax, and clawback; year-end account balances are shown plain.</span>
-                <span class="note-text">🔶 <strong>Withholding</strong> is separate from Est. Tax: it's what your financial institution deducts immediately and remits to CRA/Revenu Québec the moment you make a lump-sum withdrawal above that account's minimum (or any FTQ withdrawal). It's a prepayment already credited against Est. Tax — it doesn't add to what you owe for the year — but it does mean less cash lands in your account right when you withdraw, which matters if you need that cash immediately. Before age 71 withholding applies to the full gross registered withdrawal; from 71 on, the mandatory RRIF/LIF minimum is exempt. Years with no flag had no withholding.</span>
-                <div class="results-box table-scroll" id="scheduleOutput"></div>
-            </div>
-
-            <details class="fold"><summary>Plan details</summary><div class="fold-body">
-                <div id="optimizerReportBanner"></div>
-                <div class="results-box" id="summaryOutput"></div>
-            </div></details>
-
-            <details class="fold"><summary>Try changes</summary><div class="fold-body">
+            <details class="fold"><summary>What if? Test your plan</summary><div class="fold-body">
                             <div class="whatif-row">
                 <button type="button" onclick="compareExtraWithdrawals()">📊 Compare extra withdrawals</button>
                 <button type="button" onclick="findMaxSpending()">🎯 Find max sustainable spending</button>
@@ -995,6 +996,24 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <textarea id="auditExportBox" readonly style="display:none; width:100%; height:120px; font-size:11px; font-family:monospace; margin-bottom:8px;"></textarea>
                 <span class="note-text" id="auditExportStatus">Audit Export bundles ALL your inputs, the tax &amp; benefit rules in force, the model's built-in assumptions and the full-precision year-by-year results in one block, so every number can be re-checked from its inputs. It contains your balances and event names — share it only with whoever is auditing.</span>
             </div></details>
+
+            <h3 class="section-title">What to do each year</h3>
+            <div class="seg" role="group" aria-label="Schedule view">
+                <button type="button" class="seg-btn active" id="segCards" onclick="setScheduleView('cards')">Year plan</button>
+                <button type="button" class="seg-btn" id="segTable" onclick="setScheduleView('table')">Detailed table</button>
+            </div>
+            <div id="yearCards" class="year-cards"></div>
+            <div id="tableView" class="table-view" hidden>
+                <span class="note-text">Tap a withdrawal to see what it is for (Income, Event, Tax or Transfer), or use <strong>Expand all purposes</strong>. This table shows one representative path (flat/custom models) or the first Monte Carlo trial (for illustration only — see the success-rate summary above for the real range of outcomes under that model). Amounts in <strong>(parentheses)</strong> are money leaving an account — withdrawals, tax, and clawback; year-end account balances are shown plain.</span>
+                <span class="note-text">🔶 <strong>Withholding</strong> is separate from Est. Tax: it's what your financial institution deducts immediately and remits to CRA/Revenu Québec the moment you make a lump-sum withdrawal above that account's minimum (or any FTQ withdrawal). It's a prepayment already credited against Est. Tax — it doesn't add to what you owe for the year — but it does mean less cash lands in your account right when you withdraw, which matters if you need that cash immediately. Before age 71 withholding applies to the full gross registered withdrawal; from 71 on, the mandatory RRIF/LIF minimum is exempt. Years with no flag had no withholding.</span>
+                <div class="results-box table-scroll" id="scheduleOutput"></div>
+            </div>
+
+            <details class="fold"><summary>Technical details and assumptions</summary><div class="fold-body">
+                <div id="optimizerReportBanner"></div>
+                <div class="results-box" id="summaryOutput"></div>
+            </div></details>
+
 
             <details class="fold"><summary>Save or share</summary><div class="fold-body">
                             <div class="export-panel">
@@ -1020,7 +1039,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                 <input type="text" id="resultsProfileName" maxlength="60" placeholder="e.g. Base case, Retire at 55, Bear market test" oninput="document.getElementById('profileName').value = this.value;">
                 <div id="saveResultsStatus" class="note-text" style="margin:0;">Not saved yet.</div>
             </div>
-            <span class="note-text">Every calculation auto-saves your inputs as a draft. To keep this plan <em>and its results</em> under a name, tap <strong>💾 Save profile &amp; results</strong> — it is then listed as saved by you under "Manage Saved Profiles".</span>
+            <span class="note-text">Every calculation auto-saves your inputs as a draft. To keep this plan <em>and its results</em> under a name, tap <strong>💾 Save on this device</strong> — it is then listed as saved by you under "Manage Saved Profiles".</span>
 
             <div class="btn-group step-nav">
                 <button type="button" class="secondary" onclick="editProfile()">← Edit inputs</button>
@@ -2530,6 +2549,7 @@ The numbers in that example are placeholders from a prior year — replace every
     };
 
     function populateFormRaw(p) {
+        setTimeout(markAllTouched, 0);
         document.getElementById('profileName').value = p.name || '';
         document.getElementById('calcMode').value = p.calcMode || 'single';
         document.getElementById('currentAge').value = p.currentAge ?? 55;
@@ -3297,7 +3317,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 '. Your profile setup and these results are under "Manage Saved Profiles".';
         } else {
             el.style.color = '#a16207';
-            el.textContent = 'Auto-saved as a draft (' + (cur.timestamp || '') + '). Tap "Save profile & results" to keep it' + (cur.name ? '' : ' — add a name above first if you like') + '.';
+            el.textContent = 'Auto-saved as a draft (' + (cur.timestamp || '') + '). Tap "Save on this device" to keep it' + (cur.name ? '' : ' — add a name above first if you like') + '.';
         }
     }
 
@@ -4554,14 +4574,14 @@ The numbers in that example are placeholders from a prior year — replace every
                     ⚠️ <strong>Deficit Warning:</strong> You cannot fully maintain your target net spending of $${annualTargetSpend.toLocaleString()}/yr${inflationOnForSummary ? " (today's dollars, rising with inflation)" : ''} up until your life expectancy of age ${p.lifeExpectancy}. A cash shortfall begins at <strong>age ${shortfallRow.age}</strong> (net take-home drops to $${Math.round(shortfallRow.actualNetTakeHome).toLocaleString()}/yr). Consider increasing your retirement savings, lowering monthly spend targets, or adjusting your retirement age.
                 </div>
             `;
-            summaryLongevityHtml = `<p>⚠️ <span class="alert-highlight">Fund Longevity Status:</span> Your portfolio experiences a cash deficit mid-stream starting around <strong>age ${shortfallRow.age}</strong> and does not fully sustain your target spend through life expectancy.</p>`;
+            summaryLongevityHtml = `<p>⚠️ <span class="alert-highlight">Will your money last?</span> Not fully. Your portfolio starts running short around <strong>age ${shortfallRow.age}</strong> and does not fully sustain your target spend through life expectancy.</p>`;
         } else {
             deficitAlertHtml = `
                 <div class="optimizer-badge" style="background:#ecfdf5; border-color:#a7f3d0; color:#065f46;">
-                    ✅ <strong>Longevity Status:</strong> Your portfolio successfully maintains your full target spending right up to your life expectancy goal of age ${p.lifeExpectancy} without running a deficit.
+                    ✅ <strong>Will your money last?</strong> Yes. Your portfolio covers your full target spending right up to your life expectancy goal of age ${p.lifeExpectancy} without running a deficit.
                 </div>
             `;
-            summaryLongevityHtml = `<p>🎉 <span class="highlight">Fund Longevity Status:</span> No year throughout your timeline experiences a deficit; your portfolio successfully sustains your target net take-home spend all the way through your life expectancy target of <strong>age ${p.lifeExpectancy}</strong>.</p>`;
+            summaryLongevityHtml = `<p>🎉 <span class="highlight">Will your money last?</span> Yes. No year in your plan runs short: your portfolio covers your target spending all the way to <strong>age ${p.lifeExpectancy}</strong>.</p>`;
         }
         document.getElementById('deficitReportBanner').innerHTML = deficitAlertHtml;
 
@@ -4664,18 +4684,18 @@ The numbers in that example are placeholders from a prior year — replace every
         const retDuration = Math.max(0, p.lifeExpectancy - p.targetAge);
 
         let summaryHtml = `
-            <p><strong>Analysis Mode:</strong> ${p.hhRole ? 'Household member (own plan, share of household spending)' : (p.calcMode === 'couple' ? 'Joint Household (You &amp; Your Spouse)' : 'Stand-Alone Individual')}</p>
+            <p><strong>Plan type:</strong> ${p.hhRole ? 'Household member (own plan, share of household spending)' : (p.calcMode === 'couple' ? 'Joint Household (You &amp; Your Spouse)' : 'One person')}</p>
             ${(p.inflationMode || 'none') === 'none'
                 ? `<p><strong>All figures in today's constant dollars (no inflation):</strong> this projection assumes the return rates you entered are already inflation-adjusted (real), so spending, pensions, and tax brackets are held flat throughout. If you entered nominal (headline) returns instead, this plan is more optimistic than reality.</p>`
                 : `<p><strong>Inflation is ON:</strong> your spending, QPP/OAS and tax parameters rise each year, and the table is shown in ${p.showRealDollars ? "today's dollars" : 'future dollars (the amounts you will actually see)'}.</p>`}
-            <p><strong>Tax Engine:</strong> Combined Federal &amp; Quebec progressive brackets with proper non-refundable credits (BPA, age amount, pension income amount) and the 16.5% Quebec federal abatement — rates dated ${taxRules.verifiedDate}. Edit anytime via "⚙️ Tax &amp; Benefit Rules".</p>
+            <p><strong>Tax rules used:</strong> Combined Federal &amp; Quebec progressive brackets with proper non-refundable credits (BPA, age amount, pension income amount) and the 16.5% Quebec federal abatement — rates dated ${taxRules.verifiedDate}. Edit anytime via "⚙️ Tax &amp; Benefit Rules".</p>
             <p><strong>Selected Start Ages:</strong> Your QPP Age <span class="highlight">${chosenQppAge}</span> | Your OAS Age <span class="highlight">${chosenOasAge}</span>${p.calcMode === 'couple' ? ` | Spouse QPP Age <span class="highlight">${p.spouseQppStartAge}</span> | Spouse OAS Age <span class="highlight">${p.spouseOasStartAge}</span>` : ''}</p>
             <p><strong>Retirement Horizon:</strong> ${p.alreadyRetired ? `<strong>Already retired</strong> — projecting from age ${p.targetAge}` : `In <strong>${yearsToRet} years</strong> at age ${p.targetAge}`} (Duration: ${retDuration} yrs to age ${p.lifeExpectancy}).</p>
             <p><strong>Target Annual Net Take-Home Spend:</strong> <span class="highlight">$${getAnnualNetNeed(p).toLocaleString()} / year</span> ($${p.spendAmount.toLocaleString()}/${freqShort(p.spendFrequency)}, paid out ${p.spendFrequency})</p>
-            <p><strong>Total Estimated Lifetime Tax (illustrative path):</strong> $${Math.round(finalRun.totalTaxesPaid).toLocaleString()}${inflationOnForSummary ? ' (≈ $' + Math.round(finalRun.totalTaxesPaidToday).toLocaleString() + ' in today\'s dollars)' : ''} | <strong>Total Estimated OAS Clawback:</strong> $${Math.round(finalRun.totalClawback).toLocaleString()}</p>
+            <p><strong>Total Estimated Lifetime Tax (estimate):</strong> $${Math.round(finalRun.totalTaxesPaid).toLocaleString()}${inflationOnForSummary ? ' (≈ $' + Math.round(finalRun.totalTaxesPaidToday).toLocaleString() + ' in today\'s dollars)' : ''} | <strong>Total Estimated OAS Clawback:</strong> $${Math.round(finalRun.totalClawback).toLocaleString()}</p>
             <p>🏡 <strong>Estate at age ${finalRun.taxAtDeath.age}:</strong> portfolio $${Math.round(finalRun.taxAtDeath.portfolioAtEnd).toLocaleString()} → estimated tax at death $${Math.round(finalRun.taxAtDeath.taxAtDeath).toLocaleString()} (${(finalRun.taxAtDeath.effectiveRate * 100).toFixed(0)}% of the $${Math.round(finalRun.taxAtDeath.deemedIncome).toLocaleString()} taxable at death — registered accounts plus non-registered gains; the TFSA passes tax-free) → <strong>about $${Math.round(finalRun.taxAtDeath.afterTaxEstate).toLocaleString()} left for family</strong>${inflationOnForSummary ? ' (≈ $' + Math.round(finalRun.taxAtDeath.afterTaxEstateToday).toLocaleString() + ' in today\'s dollars)' : ''}.</p>
             ${inflationSummaryHtml}
-            <p><strong>🔶 Total Withholding Tax (illustrative path):</strong> $${Math.round(finalRun.totalWithholdingTax).toLocaleString()} — deducted immediately at each lump-sum withdrawal above that account's minimum; already counted toward the lifetime tax figure above, not on top of it.</p>
+            <p><strong>🔶 Total Withholding Tax (estimate):</strong> $${Math.round(finalRun.totalWithholdingTax).toLocaleString()} — deducted immediately at each lump-sum withdrawal above that account's minimum; already counted toward the lifetime tax figure above, not on top of it.</p>
         `;
 
         if (finalRun.eventLog && finalRun.eventLog.length > 0) {
@@ -5233,12 +5253,17 @@ The numbers in that example are placeholders from a prior year — replace every
             return (name ? name.slice(0, 18) + (name.length > 18 ? '…' : '') + ' · ' : '') + (amt > 0 ? '$' + Math.round(amt).toLocaleString() : '');
         }
         const nums = Array.from(card.querySelectorAll('input[type="number"]'));
-        const first = nums.find(i => i.value !== '' && parseFloat(i.value) !== 0);
-        if (!first) return '';
+        const first = nums.find(i => i.value !== '' && parseFloat(i.value) !== 0 && !/age/i.test(i.id)) || nums.find(i => i.value !== '' && parseFloat(i.value) !== 0);
+        if (!first) {
+            const ttl = (card.querySelector('.ch-title') || {}).textContent || '';
+            if (/employer pension|Bell pension/i.test(ttl)) { const sel = card.querySelector('select'); return sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text.slice(0, 24) : ''; }
+            return nums.length ? 'Not used' : '';
+        }
         let s = fmtInputMoney(first.id, first.value);
         const second = nums.find(i => i !== first && /^contrib/i.test(i.id) && parseFloat(i.value) > 0);
         if (second) s += ' · +' + fmtInputMoney('Amount', second.value) + '/yr';
         else if (nums.some(i => /^contrib/i.test(i.id))) s += ' · not adding';
+        if (s.charAt(0) === '$' && first.dataset.touched !== '1') s += ' · example';
         return s;
     }
     function refreshCardSummary(card) {
@@ -5248,6 +5273,32 @@ The numbers in that example are placeholders from a prior year — replace every
     function refreshCollapsibleSummaries() {
         document.querySelectorAll('.asset-row.collapsible').forEach(refreshCardSummary);
     }
+    // One plain sentence under each account name: what it is and where to find the number.
+    const ACCT_HELP = [
+            [/^📈 Inflation/, "Prices rise over time. These settings keep your spending power the same from year to year."],
+            [/^RRSP/, "Your registered retirement savings. Every dollar you take out counts as taxable income. The balance is on your bank, insurer or investment statement."],
+            [/^TFSA/, "Your tax-free savings. Money taken out is not taxed and does not reduce your government benefits."],
+            [/^Locked-in/, "Pension money moved out of an employer plan, with yearly withdrawal limits. The balance is on your LIRA or LIF statement."],
+            [/^Bell pension/, "Your Bell Canada defined-contribution (DC) pension savings. The balance is on your Bell pension statement."],
+            [/^FTQ/, "A labour-sponsored fund such as the Fonds de solidarité FTQ, usually held inside an RRSP. Taxed as income when you take it out."],
+            [/^Non-registered/, "Savings outside registered accounts. Only the profit (growth, interest and dividends) is taxed."],
+            [/^Set-payout/, "A pension that pays a fixed amount for life, such as a public-sector plan. See your pension statement."],
+            [/^Government pensions/, "Your estimated monthly QPP and OAS at 65. Find them in your Retraite Québec account and your My Service Canada account."]
+    ];
+    function updateReturnPresets() {
+        const a = parseFloat((document.getElementById('returnPre') || {}).value), b = parseFloat((document.getElementById('returnPost') || {}).value);
+        document.querySelectorAll('#retPresets button').forEach(x => x.classList.toggle('active', parseFloat(x.dataset.pre) === a && parseFloat(x.dataset.post) === b));
+    }
+    function applyReturnPreset(pre, post) {
+        [['returnPre', pre], ['returnPost', post]].forEach(x => { const e = document.getElementById(x[0]); if (e) { e.value = x[1]; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } });
+        updateReturnPresets();
+    }
+    document.addEventListener('input', e => { if (e.target && /^return(Pre|Post)$/.test(e.target.id)) updateReturnPresets(); });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(updateReturnPresets, 0));
+    function markAllTouched() {
+        document.querySelectorAll('input, select').forEach(e => { e.dataset.touched = '1'; });
+        refreshCollapsibleSummaries(); updateReturnPresets();
+    }
     function initCollapsibles() {
         document.querySelectorAll('.asset-row').forEach(card => {
             const h = card.firstElementChild;
@@ -5256,6 +5307,8 @@ The numbers in that example are placeholders from a prior year — replace every
             h.innerHTML = '<span class="ch-title">' + h.innerHTML + '</span><span class="ch-sum"></span><span class="ch-chev" aria-hidden="true">›</span>';
             h.setAttribute('role', 'button');
             h.tabIndex = 0;
+            const hlp = ACCT_HELP.find(x => x[0].test(card.querySelector('.ch-title').textContent));
+            if (hlp && !card.querySelector(':scope > .acct-help')) { const dv = document.createElement('div'); dv.className = 'acct-help'; dv.textContent = hlp[1]; h.insertAdjacentElement('afterend', dv); }
             const toggle = () => setCardCollapsed(card, !cardIsCollapsed(card));
             h.addEventListener('click', toggle);
             h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -5267,6 +5320,8 @@ The numbers in that example are placeholders from a prior year — replace every
             const c = el && el.closest('.asset-row.collapsible');
             if (c) setCardCollapsed(c, false);
         });
+        const touch = e => { if (e.target && e.target.dataset) e.target.dataset.touched = '1'; };
+        document.addEventListener('input', touch, true); document.addEventListener('change', touch, true);
         document.addEventListener('input', e => {
             const c = e.target.closest && e.target.closest('.asset-row.collapsible');
             if (c) refreshCardSummary(c);
@@ -5532,10 +5587,38 @@ The numbers in that example are placeholders from a prior year — replace every
             const headline = deficit ? 'Short: only ' + perMo + '/mo' : 'Take out ' + fmtCompact(withdrawn);
             const sub = deficit ? 'Target not fully met' : 'To spend ' + perMo + '/mo' + (has(taxBill) ? ' · tax ' + fmtCompact(taxBill) : '') + (moveTot > 1 ? ' · move ' + fmtCompact(moveTot) : '');
             return '<details class="yp' + (deficit ? ' deficit' : '') + '"><summary>' +
-                '<span class="yp-age">' + r.age + '<small>age</small><em class="yp-rate ' + (r.rate > 0.00005 ? 'up' : r.rate < -0.00005 ? 'down' : '') + '">' + (r.rate > 0 ? '+' : '') + (r.rate * 100).toFixed(1) + '%</em></span>' +
+                '<span class="yp-age">' + r.age + '<small>age</small><em class="yp-rate ' + (r.rate > 0.00005 ? 'up' : r.rate < -0.00005 ? 'down' : '') + '">' + (r.rate > 0 ? '+' : '') + (r.rate * 100).toFixed(1) + '%</em><small>growth</small></span>' +
                 '<span class="yp-main"><b>' + headline + '</b><small>' + sub + '</small></span>' +
                 '<span class="yp-chev">›</span></summary><div class="yp-body">' + body + '</div></details>';
         }).join('');
+    }
+
+    // Plain-words summary of the plan at the top of the results (accounts used by age range, TFSA, government pensions).
+    function planSummaryHtml(rows, p, PA, OA, shortAge) {
+        const ACCS = [['rrsp', 'RRSP / RRIF', 'rrspDraw'], ['rlif', 'Unlocked RRSP / RRIF', 'rlifUnlockedDraw'], ['lira', 'Locked-in (Bell pension + LIRA)', 'liraDraw'], ['nonReg', 'Non-registered savings', 'nonRegDraw'], ['ftq', 'FTQ fund', 'ftqDraw'], ['tfsa', 'TFSA', 'tfsaDraw']];
+        const has = v => Math.round(v || 0) !== 0;
+        const list = rows.filter(r => r.age <= p.lifeExpectancy && (!shortAge || r.age < shortAge));
+        if (!list.length) return '';
+        const segs = [];
+        list.forEach(r => {
+            const tot = ACCS.reduce((t, a) => t + Math.max(0, r[a[2]] || 0), 0);
+            const names = tot > 0 ? ACCS.filter(a => (r[a[2]] || 0) > tot * 0.1).map(a => a[1]) : [];
+            const key = names.join(' + ');
+            const last = segs[segs.length - 1];
+            if (last && last.key === key) last.to = r.age; else segs.push({ key: key, from: r.age, to: r.age });
+        });
+        const shown = segs.slice(0, 5);
+        let h = '<div class="plan-sum"><h3>Your plan in a few lines</h3>';
+        shown.forEach(sg => {
+            h += '<div class="ps-row"><span>' + (sg.from === sg.to ? 'Age ' + sg.from : 'Ages ' + sg.from + '–' + sg.to) + '</span><b>' + (sg.key || 'No withdrawal needed') + '</b></div>';
+        });
+        if (segs.length > shown.length) h += '<div class="ps-note">The mix of accounts changes a few more times; open the year cards below.</div>';
+        const tfsaUsed = list.find(r => has(r.tfsaDraw));
+        if (tfsaUsed) h += '<p class="ps-note">Your TFSA is used from age ' + tfsaUsed.age + '.</p>';
+        else if (has(list[0].simTfsa)) h += '<p class="ps-note">Your TFSA is not used: it keeps growing tax-free and is left to your family.</p>';
+        h += '<p class="ps-note">QPP starts at age ' + PA + ' and OAS at age ' + OA + '.</p>';
+        if (Math.min(PA, OA) > p.targetAge) h += '<p class="ps-note">Your withdrawals drop then, because these pensions pay part of your spending.</p>';
+        return h + '</div>';
     }
 
     function renderResultsUi(finalRun, p, taxRules, qppAge, oasAge) {
@@ -5553,6 +5636,10 @@ The numbers in that example are placeholders from a prior year — replace every
         const estate = (infl && p.showRealDollars) ? te.afterTaxEstateToday : te.afterTaxEstate;
         const endBal = (infl && p.showRealDollars) ? te.portfolioAtEndToday : te.portfolioAtEnd;
         const dollars = infl ? (p.showRealDollars ? "today's dollars" : 'future dollars') : "today's dollars";
+        const perN = ({ weekly: 52, yearly: 1 })[p.spendFrequency] || 12;
+        const lastRow = rows.filter(r => r.age <= p.lifeExpectancy).slice(-1)[0];
+        const todayNote = (infl && !p.showRealDollars && !short && rows.length && lastRow)
+            ? '<p class="hero-note">In future dollars that is ' + fmtNum(rows[0].actualNetTakeHome / perN) + '/' + freqWord(p.spendFrequency) + ' at ' + rows[0].age + ' and ' + fmtNum(lastRow.actualNetTakeHome / perN) + '/' + freqWord(p.spendFrequency) + ' at ' + lastRow.age + ': the same buying power as ' + spendTxt + ' today.</p>' : '';
         const mc = (p.returnModel === 'montecarlo' && lastAuditMeta && lastAuditMeta.monteCarlo) ? lastAuditMeta.monteCarlo : null;
         hero.innerHTML =
             '<div class="hero' + (short ? ' short' : '') + '">' +
@@ -5561,6 +5648,7 @@ The numbers in that example are placeholders from a prior year — replace every
             '<p>' + (short
                 ? 'Your ' + spendTxt + ' target can’t be fully met from age ' + shortfall.age + ' (take-home drops to ' + fmtNum(shortfall.actualNetTakeHome) + ' a year). You could spend a little less, retire later, or save more.'
                 : 'You can spend ' + spendTxt + ' every year' + (infl ? ', rising with inflation' : '') + '.') + '</p>' +
+            todayNote +
             (mc ? '<p class="hero-mc">🎲 <strong>' + Math.round(mc.successRate * 100) + '%</strong> of ' + mc.trials + ' simulated markets fund the plan.</p>' : '') +
             '<div class="stat-grid">' +
             '<div class="stat-card"><span class="stat-number">' + fmtCompact(sumRows('taxPaid')) + '</span><div class="stat-label">Total income tax</div></div>' +
@@ -5570,6 +5658,7 @@ The numbers in that example are placeholders from a prior year — replace every
             '</div>' +
             '<p class="hero-foot">Retire at ' + p.targetAge + ' · QPP at ' + qppAge + ' · OAS at ' + oasAge + ' · amounts in ' + dollars + '</p>' +
             '</div>' +
+            planSummaryHtml(rows, p, qppAge, oasAge, short ? shortfall.age : 0) +
             '<div class="chart-card"><h3>Your savings over time</h3>' + balanceChartSvg(rows, short ? shortfall.age : null) +
             '<p class="chart-note">All accounts together, each year end (' + dollars + ').</p></div>';
 
@@ -6074,7 +6163,7 @@ The numbers in that example are placeholders from a prior year — replace every
             }
             chosenQppAge = bestQpp;
             chosenOasAge = bestOas;
-            optimizationMessage = `🤖 <strong>Optimizer Active:</strong> Evaluated all QPP (60–70) &amp; OAS (65–70) start-age permutations for you. Selected <strong>QPP at Age ${chosenQppAge}</strong> and <strong>OAS at Age ${chosenOasAge}</strong>` + (p.calcMode === 'couple' ? ` (your spouse's start ages are used as entered, not auto-optimized).` : `.`);
+            optimizationMessage = `🤖 <strong>Best start ages found:</strong> we tested every QPP (60–70) &amp; OAS (65–70) start-age combination for you. Selected <strong>QPP at Age ${chosenQppAge}</strong> and <strong>OAS at Age ${chosenOasAge}</strong>` + (p.calcMode === 'couple' ? ` (your spouse's start ages are used as entered, not auto-optimized).` : `.`);
         } else {
             optimizationMessage = `⚙️ <strong>Manual Configuration Active:</strong> Using your manual QPP start age ${chosenQppAge} and OAS start age ${chosenOasAge}.`;
         }
