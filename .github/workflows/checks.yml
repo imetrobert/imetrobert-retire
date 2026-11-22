@@ -1,0 +1,38 @@
+name: Checks
+# Runs the planner checks and refreshes docs/code-map.md. Weekly, on demand, and when index.html
+# or the scripts change. A red run emails you (GitHub default). It never blocks the site.
+on:
+  schedule:
+    - cron: '30 12 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['index.html', 'account.js', 'scripts/**']
+permissions:
+  contents: write
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the planner
+        run: python3 scripts/check_planner.py
+      - name: Test sign-in and saved plans (stubbed server)
+        run: |
+          pip install playwright
+          python3 -m playwright install --with-deps chromium
+          python3 scripts/test_account.py
+      - name: Refresh the code map
+        run: python3 scripts/code_map.py
+      - name: Commit the code map if it changed
+        run: |
+          if [ -n "$(git status --porcelain docs/code-map.md)" ]; then
+            git config user.name "github-actions"
+            git config user.email "actions@users.noreply.github.com"
+            git add docs/code-map.md
+            git commit -m "Refresh code map"
+            git push
+          fi
