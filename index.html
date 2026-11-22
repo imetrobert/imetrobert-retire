@@ -3199,6 +3199,7 @@ The numbers in that example are placeholders from a prior year — replace every
         profile.results = resultsSummary();
         profile.savedExplicitly = true;
         profile.explicitSavedMs = Date.now();
+        justSavedId = profile.id;
         localStorage.setItem('csl_retire_profile_v2026', JSON.stringify(profile));
         const all = getAllProfiles();
         all[profile.id] = profile;
@@ -3266,6 +3267,30 @@ The numbers in that example are placeholders from a prior year — replace every
         localStorage.setItem('csl_all_profiles_v2026', JSON.stringify(all));
     }
 
+    // ---- Device vs cloud status per scenario --------------------------------
+    // The cloud copy is encrypted, so this page cannot read it. Instead it remembers a fingerprint of
+    // each scenario at the moment it was last saved to the cloud FROM THIS DEVICE and compares it.
+    let justSavedId = null;
+    const SYNC_KEY = 'csl_all_profiles_v2026_cloudsync';
+    function planSig(p) {
+        const c = Object.assign({}, p);
+        ['timestamp', 'timestampMs', 'explicitSavedMs', 'savedExplicitly', 'results', 'savedStep'].forEach(k => delete c[k]);
+        const norm = v => Array.isArray(v) ? v.map(norm) : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = norm(v[k]), o), {}) : v;
+        const str = JSON.stringify(norm(c));
+        let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+        return String(h) + ':' + str.length;
+    }
+    function getSyncMap() { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}'); } catch (e) { return {}; } }
+    window.planCloudMark = function (p) {
+        try { const m = getSyncMap(); m[p.id] = planSig(p); localStorage.setItem(SYNC_KEY, JSON.stringify(m)); } catch (e) { /* status just stays unknown */ }
+    };
+    // For the cloud list: how does this device's copy of the same scenario compare with the cloud one?
+    window.planDeviceState = function (cloudP) {
+        const dv = cloudP && getAllProfiles()[cloudP.id];
+        if (!dv) return 'none';
+        return planSig(dv) === planSig(cloudP) ? 'same' : 'diff';
+    };
+
     function renderProfileManager() {
         const container = document.getElementById('profileListContainer');
         const allProfiles = getAllProfiles();
@@ -3276,21 +3301,30 @@ The numbers in that example are placeholders from a prior year — replace every
             return;
         }
         let html = '';
+        const syncMap = getSyncMap();
+        let latestId = null, latestMs = 0;
+        keys.forEach(k => { const p = allProfiles[k]; if (p.savedExplicitly && (p.explicitSavedMs || 0) > latestMs) { latestMs = p.explicitSavedMs; latestId = k; } });
         keys.forEach((k, i) => {
             const p = allProfiles[k];
+            const isJust = justSavedId === k, isLatest = isJust || (k === latestId && Date.now() - latestMs < 24 * 3600 * 1000);
+            const sync = !syncMap[k] ? 'none' : (syncMap[k] === planSig(p) ? 'same' : 'diff');
+            const syncHtml = sync === 'same' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#dcfce7; color:#166534; font-size:12px; font-weight:600;">☁ Same on this device and in the cloud</span>'
+                : sync === 'diff' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#ffedd5; color:#9a3412; font-size:12px; font-weight:600;">⚠ Newer on this device than in the cloud</span>'
+                : '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:12px; font-weight:600;">Device only, not in the cloud yet</span>';
+            const pill = isLatest ? '<span style="display:inline-block; margin:0 0 6px; padding:2px 9px; border-radius:999px; background:#166534; color:#fff; font-size:11px; font-weight:700; letter-spacing:.05em;">' + (isJust ? 'JUST SAVED' : 'LATEST SAVE') + '</span><br>' : '';
             const kind = p.calcMode === 'couple' ? 'Joint Profile (You + Spouse)' : 'Individual Profile';
             const title = p.name ? escHtml(p.name) : ('Unnamed scenario ' + (keys.length - i));
             const isRenaming = renamingId === k;
             const isDeleting = pendingDeleteId === k;
             const btn = 'padding:6px 12px; font-size:12px;';
             html += `
-                <div style="background:#fff; padding:10px; border-radius:6px; margin-bottom:8px; border:1px solid #cbd5e1;">
+                <div id="pm-${escHtml(k)}" style="background:${isLatest ? '#f0fdf4' : '#fff'}; padding:10px; border-radius:6px; margin-bottom:8px; border:${isLatest ? '2px solid #16a34a' : '1px solid #cbd5e1'};">
                     <div style="margin-bottom:6px;">
-                        ${isRenaming
+                        ${pill}${isRenaming
                             ? `<input type="text" id="renameInput" maxlength="60" value="${escHtml(p.name || '')}" placeholder="Scenario name" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px;">`
                             : `<strong>${title}</strong><br>`}
                         <small style="color:#64748b;">${kind} | Saved: ${escHtml(p.timestamp || '')} | Net spend: $${escHtml(p.spendAmount)}/${freqShort(p.spendFrequency)} | Retire age: ${escHtml(p.targetAge)}</small>
-                        <br><small style="color:${p.savedExplicitly ? '#166534' : '#a16207'};">${p.savedExplicitly ? '✓ Saved by you' : 'Auto-saved draft'}${p.results ? ' | ' + escHtml(resultsLine(p.results)) : ''}</small>
+                        <br><small style="color:${p.savedExplicitly ? '#166534' : '#a16207'};">${p.savedExplicitly ? '✓ Saved by you' : 'Auto-saved draft'}${p.results ? ' | ' + escHtml(resultsLine(p.results)) : ''}</small>${syncHtml}
                     </div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         ${isRenaming ? `
@@ -3308,6 +3342,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 </div>`;
         });
         container.innerHTML = html;
+        if (justSavedId) { const jb = document.getElementById('pm-' + justSavedId); if (jb && jb.scrollIntoView) jb.scrollIntoView({ block: 'center' }); }
         if (renamingId) { const el = document.getElementById('renameInput'); if (el) el.focus(); }
     }
 
