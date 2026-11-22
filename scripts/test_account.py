@@ -122,7 +122,7 @@ with sync_playwright() as pw:
     page.wait_for_timeout(300)
     check(page.input_value('#currentAge') == '61', 'saved plan reopened with its values')
     # sign out and clear device plans
-    page.click('#menuBtn'); page.click('#awr-mi-plans'); page.click('text=/^Sign out$|^Se déconnecter$/'); page.click('text=/clear device plans|effacer les plans/')
+    page.click('#menuBtn'); page.click('#awr-mi-plans'); page.click('text=/^Sign out$|^Se déconnecter$/'); page.click('#awr-so-clear'); page.click('#awr-so-clear')
     page.wait_for_selector('#awr-gate')
     check(page.evaluate("localStorage.getItem('%s_profile_v1')" % PREFIX) is None, 'device plans cleared on sign-out')
     check(page.is_hidden('#currentAge'), 'planner hidden again after sign-out')
