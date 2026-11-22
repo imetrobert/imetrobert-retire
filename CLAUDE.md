@@ -24,6 +24,7 @@ Line numbers: `docs/code-map.md` (generated). The first ~25 lines of `index.html
   Its documentation link is `CFG.docs` (blank for now = link hidden; set it if a guide is added). App id `retire-personal`; the Quebec and Ontario planners have their own copies.
 - `statements.js` (+ `vendor/pdfjs/`) = reads a government statement PDF on the device and fills QPP fields after Preview/Apply (recipe 11 in docs/common-edits.md). No network calls. Test: `python3 scripts/test_statements.py`. Only FAKE sample PDFs in `tests/fixtures/` (this repo is public; never a real statement).
 - Household mode: spouse fills in their own full form, results merge (common-edits recipe on household mode). Test: `python3 scripts/test_household.py`.
+- Pension income splitting (household mode, on by default): `hhSplitPensions` moves up to 50% of the higher earner's eligible pension income each year via `p.hhTaxAdj`; recipe in `docs/common-edits.md` (recipe 14).
 - Expense list: optional list on Step 2 that fills and locks the spending fields (common-edits recipe on the expense list). Test: `python3 scripts/test_expenses.py`.
 - Tax check: `python3 scripts/test_tax.py` compares the tax engine and yearly plan with an independent calculation (own copy of the 2026 numbers at the top of the script). Update that copy whenever the tax numbers change (common-edits recipe on the tax check).
 - Test the gate: `python3 scripts/test_account.py` (stubbed server, needs `pip install playwright`). CI runs it.

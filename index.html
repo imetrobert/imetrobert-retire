@@ -3478,7 +3478,7 @@ The numbers in that example are placeholders from a prior year — replace every
         r.qcBrackets = sb(rules.qcBrackets);
         return r;
     }
-    const MONEY_FIELDS = ['rrspDraw', 'simRrsp', 'liraDraw', 'simLira', 'nonRegDraw', 'simNonReg', 'ftqDraw', 'simFtq', 'tfsaDraw', 'simTfsa',
+    const MONEY_FIELDS = ['splitAdj', 'rrspDraw', 'simRrsp', 'liraDraw', 'simLira', 'nonRegDraw', 'simNonReg', 'ftqDraw', 'simFtq', 'tfsaDraw', 'simTfsa',
         'rlifTransferThisYear', 'oRrsp', 'oRlif', 'oLira', 'oBell', 'oNon', 'oFtq', 'oTfsa', 'ulBellBefore', 'ulOtherBefore', 'ulFromBell', 'ulFromOther', 'rlifUnlockedDraw', 'simRlifUnlocked', 'qppInc', 'oasIncGross', 'oasIncNet', 'pensionInc', 'bellDraw', 'simBellBal', 'clawback', 'taxPaid',
         'withholdingTax', 'whtRrsp', 'whtRlif', 'whtLira', 'whtFtq', 'actualNetTakeHome', 'reinvested', 'nonRegYieldIncome', 'extraRegWithdrawal', 'eventTotalThisYear', 'targetSpend', 'tfsaContribution', 'tfsaAnnualLimit', 'tfsaRoomLeft', 'nonRegCostBase'];
 
@@ -4062,7 +4062,9 @@ The numbers in that example are placeholders from a prior year — replace every
             //   (pension income splitting), each taxed on their own half
             //   with their own age and credits; Quebec's senior credits
             //   are tested against combined family income.
-            const taxAndClawback = (stdTaxable) => {
+            const splitAdj = (p.hhTaxAdj && p.hhTaxAdj[yr]) || 0;   // household pension income splitting: income moved to (+) or from (-) this person
+            const taxAndClawback = (stdTaxableRaw) => {
+                const stdTaxable = stdTaxableRaw + splitAdj;
                 const perPersonOas = oasIncGross / personCount;
                 const clawbackPerPerson = Math.max(0, Math.min(perPersonOas, (stdTaxable / personCount - taxRules.oasClawbackThreshold) * taxRules.oasClawbackRate));
                 const clawback = clawbackPerPerson * personCount;
@@ -4074,7 +4076,7 @@ The numbers in that example are placeholders from a prior year — replace every
                     const t2 = calculateTax(half, spouseAgeSim !== null ? spouseAgeSim : currentAgeSim, peHalf, taxRules, { alone: false, familyIncome: taxableAfter, famShare: 0.5 });
                     tax = { fedTax: t1.fedTax + t2.fedTax, qcTax: t1.qcTax + t2.qcTax, totalTax: t1.totalTax + t2.totalTax };
                 } else {
-                    tax = calculateTax(taxableAfter, currentAgeSim, pensionEligibleIncome, taxRules, { alone: p.livesAlone !== 'no' });
+                    tax = calculateTax(taxableAfter, currentAgeSim, Math.max(0, pensionEligibleIncome + splitAdj), taxRules, { alone: p.livesAlone !== 'no' });
                 }
                 return { tax, clawback };
             };
@@ -4296,6 +4298,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 rlifTransferThisYear, rlifUnlockedDraw, simRlifUnlocked, oRrsp: opn.rrsp, oRlif: opn.rlif, oLira: opn.lira, oBell: opn.bell, oNon: opn.non, oFtq: opn.ftq, oTfsa: opn.tfsa, ulBellBefore: ul.bB, ulOtherBefore: ul.oB, ulFromBell: ul.fB, ulFromOther: ul.fO, ulOtherElig: ul.elig,
                 qppInc, oasIncGross, oasIncNet, pensionInc: annualRregop, bellDraw, simBellBal: simBell, clawback: yearClawback,
                 taxPaid, withholdingTax, whtRrsp: whtP.whtRrsp, whtRlif: whtP.whtRlif, whtLira: whtP.whtLira, whtFtq: whtP.whtFtq, actualNetTakeHome, reinvested, nonRegYieldIncome, targetSpend: annualNetNeedY, inflationIndex: idxY, extraRegWithdrawal: extraRegThisYear, tfsaContribution: reinvestToTfsa, tfsaSkippedLossYear: !!(tfsaSkipThisYear && tfsaRoom > 1 && p.tfsaMaxMode && p.tfsaMaxMode !== 'off'), tfsaAnnualLimit: tfsaLimitY, tfsaRoomLeft: tfsaRoom, nonRegGainFraction: nonRegGainFrac, nonRegCostBase: nonRegACB,
+                splitBase: standardTaxable, splitElig: pensionEligibleIncome, splitAdj,
                 eventTotalThisYear, eventNamesThisYear, eventDetailsThisYear, purposes
             });
         }
@@ -5483,7 +5486,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function hhLabel(k) { const n = String((HH.names && HH.names[k]) || '').trim(); return n || (k === 'me' ? 'You' : 'Your spouse'); }
     function hhClone(v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); }
     function hhPick(src) { const o = {}; HH_KEYS.forEach(k => { if (src && k in src) o[k] = hhClone(src[k]); }); return o; }
-    function hhStrip(p) { const o = hhClone(p) || {}; ['id', 'timestamp', 'timestampMs', 'name', 'hhSpouse', 'hhSplit', 'hhNames'].forEach(k => delete o[k]); return o; }
+    function hhStrip(p) { const o = hhClone(p) || {}; ['id', 'timestamp', 'timestampMs', 'name', 'hhSpouse', 'hhSplit', 'hhNames', 'hhPis'].forEach(k => delete o[k]); return o; }
     function hhBlank(me) {
         const s = hhClone(me) || {}; delete s.hhSpouse; delete s.id; s.name = '';
         ['currentRrsp', 'contribRrsp', 'currentTfsa', 'contribTfsa', 'liraBalance', 'contribLira', 'fedDcBalance', 'contribFedDc', 'ftqBalance', 'contribFtq', 'currentNonReg', 'contribNonReg', 'ownPensionAnnual', 'extraRegAmt', 'tfsaRoomNow']
@@ -5510,11 +5513,11 @@ The numbers in that example are placeholders from a prior year — replace every
         let me;
         if (HH.who === 'spouse') { HH.spouse = raw; me = Object.assign({}, HH.me); }
         else { HH.me = raw; me = raw; }
-        me.hhSpouse = hhStrip(HH.spouse); me.hhSplit = HH.split; me.hhNames = { me: HH.names.me, sp: HH.names.sp };
+        me.hhSpouse = hhStrip(HH.spouse); me.hhSplit = HH.split; me.hhPis = HH.pis; me.hhNames = { me: HH.names.me, sp: HH.names.sp };
         return me;
     }
     function populateForm(p) {
-        HH.who = 'me'; HH.me = p; HH.split = (p && p.hhSplit) || ''; HH.view = 'house'; HH.plans = null; HH.legacy = '';
+        HH.who = 'me'; HH.me = p; HH.split = (p && p.hhSplit) || ''; HH.pis = (p && p.hhPis === 'off') ? 'off' : 'on'; HH.pisInfo = null; HH.view = 'house'; HH.plans = null; HH.legacy = '';
         HH.names = { me: String((p && p.hhNames && p.hhNames.me) || ''), sp: String((p && p.hhNames && p.hhNames.sp) || '') };
         if (p && p.calcMode === 'couple') {
             if (p.hhSpouse) { HH.spouse = Object.assign(hhBlank(p), p.hhSpouse, { calcMode: 'couple' }); HH.visited = true; }
@@ -5615,10 +5618,60 @@ The numbers in that example are placeholders from a prior year — replace every
         const rules = getTaxRules();
         HH.prof = hhPlanProfiles();
         HH.plans = { me: hhPlanFor(HH.prof.me, rules), sp: hhPlanFor(HH.prof.sp, rules) };
+        HH.pisInfo = null;
+        if (HH.pis !== 'off') { try { hhSplitPensions(rules); } catch (e) { HH.pisInfo = null; } }
         saveProfileProgress();
         document.getElementById('hhTabs').hidden = false;
         hhUi();
         hhShowView(view || HH.view || 'house');
+    }
+    // ---- Pension income splitting (household mode) ----
+    // Each person's plan can carry p.hhTaxAdj[yearIndex]: income moved to (+) or from (-) them for tax and
+    // OAS clawback only (cash does not move). Every year, up to 50% of the higher earner's eligible pension
+    // income moves to the other spouse, as far as it evens out their taxable incomes. Kept only if it lowers tax.
+    function hhRunFixed(pl, rules, adj) {
+        const pr = Object.assign({}, pl.p, { hhTaxAdj: adj || null });
+        return { p: pr, q: pl.q, o: pl.o, run: withRepeatableRandom(pr.returnModel === 'montecarlo', () => runSimulation(pr, pl.q, pl.o, rules, true)) };
+    }
+    function hhTaxSum(pl) { return pl.run.scheduleRows.reduce((s, r) => s + (r.taxPaid || 0) + (r.clawback || 0), 0); }
+    function hhSplitPensions(rules) {
+        const A0 = HH.plans.me, B0 = HH.plans.sp;
+        const seed = o => Object.assign({}, o, { p: Object.assign({}, o.p, { mcRepeatable: true }) });
+        const a0 = hhRunFixed(seed(A0), rules, null), b0 = hhRunFixed(seed(B0), rules, null);
+        const baseTax = hhTaxSum(a0) + hhTaxSum(b0);
+        let a = a0, b = b0, best = null;
+        for (let pass = 0; pass < 3; pass++) {
+            const ra = a.run.scheduleRows, rb = b.run.scheduleRows, n = Math.min(ra.length, rb.length), adjA = [], adjB = [];
+            for (let i = 0; i < n; i++) {
+                const x = ra[i], y = rb[i], d = ((x.splitBase || 0) - (y.splitBase || 0)) / 2;
+                if (d > 0) { const t = Math.round(Math.min(d, 0.5 * (x.splitElig || 0))); adjA[i] = -t; adjB[i] = t; }
+                else if (d < 0) { const t = Math.round(Math.min(-d, 0.5 * (y.splitElig || 0))); adjB[i] = -t; adjA[i] = t; }
+            }
+            a = hhRunFixed(seed(A0), rules, adjA); b = hhRunFixed(seed(B0), rules, adjB);
+            const tot = hhTaxSum(a) + hhTaxSum(b);
+            if (!best || tot < best.tot) best = { a: a, b: b, tot: tot, adjA: adjA };
+        }
+        if (best && best.tot < baseTax - 50) {
+            HH.plans = { me: best.a, sp: best.b };
+            HH.prof.me = best.a.p; HH.prof.sp = best.b.p;
+            let moved = 0, years = 0;
+            best.adjA.forEach(v => { if (v) { moved += Math.abs(v); years++; } });
+            HH.pisInfo = { saved: baseTax - best.tot, moved: moved, years: years };
+        } else HH.pisInfo = { saved: 0, moved: 0, years: 0 };
+    }
+    function hhSetPis() { HH.pis = document.getElementById('hhPisChk').checked ? 'on' : 'off'; hhCalculate('house'); }
+    function hhSplitCell(a, b, nm, ns) {
+        const v = a && a.splitAdj ? a.splitAdj : 0;
+        if (!v) return '<td>–</td>';
+        return '<td><b>$' + Math.round(Math.abs(v)).toLocaleString() + '</b><small><i>Moved to</i> <span>' + (v < 0 ? ns : nm) + '</span></small></td>';
+    }
+    function hhPisBlock(fmt) {
+        const on = HH.pis !== 'off', inf = HH.pisInfo;
+        let h = '<div class="hh-split"><label class="hh-pis"><input type="checkbox" id="hhPisChk"' + (on ? ' checked' : '') + ' onchange="hhSetPis()"> Split eligible pension income between spouses to lower tax</label></div>';
+        if (on && inf) h += inf.saved > 0
+            ? '<div class="hh-cards"><div class="hh-card"><small>Tax and clawback saved by splitting pension income</small><b>' + fmt(inf.saved) + '</b><span>estimate over the plan</span></div></div>'
+            : '<div class="hh-status">Splitting pension income would not lower your tax in this plan.</div>';
+        return h;
     }
     function hhSiblings(hide) {
         const st = document.querySelector('.question-step[data-step="4"]'); if (!st) return;
@@ -5636,7 +5689,8 @@ The numbers in that example are placeholders from a prior year — replace every
             document.getElementById('hhPanel').hidden = true; hhSiblings(false);
             hhActiveProfile = HH.prof[v];
             try { calculateRetirementPlanCore(); } finally { hhActiveProfile = null; }
-            note.hidden = false; note.textContent = v === 'me' ? 'Your own plan, run on your share of the household spending.' : 'Your spouse\'s own plan, run on their share of the household spending.';
+            note.hidden = false; const sx = HH.prof[v] && HH.prof[v].hhTaxAdj;
+            note.textContent = v === 'me' ? (sx ? 'Your own plan, run on your share of the household spending, including pension income moved between you and your spouse.' : 'Your own plan, run on your share of the household spending.') : (sx ? 'Your spouse\'s own plan, run on their share of the household spending, including pension income moved between you and your spouse.' : 'Your spouse\'s own plan, run on their share of the household spending.');
             hhUi();
         }
     }
@@ -5664,7 +5718,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const net = (a ? a.actualNetTakeHome || 0 : 0) + (b ? b.actualNetTakeHome || 0 : 0);
             const tax = (a ? (a.taxPaid || 0) + (a.clawback || 0) : 0) + (b ? (b.taxPaid || 0) + (b.clawback || 0) : 0);
             taxTot += tax;
-            rows += '<tr' + (net < need * 0.98 ? ' class="hh-short"' : '') + '><td>' + (y0 + i) + '</td><td>' + (a ? a.age : '–') + ' / ' + (b ? b.age : '–') + '</td><td>' + fmt(need) + '</td><td>' + fmt(net) + '</td><td>' + fmt(tax) + '</td>'
+            rows += '<tr' + (net < need * 0.98 ? ' class="hh-short"' : '') + '><td>' + (y0 + i) + '</td><td>' + (a ? a.age : '–') + ' / ' + (b ? b.age : '–') + '</td><td>' + fmt(need) + '</td><td>' + fmt(net) + '</td><td>' + fmt(tax) + '</td>' + hhSplitCell(a, b, nm, ns)
                 + cell(a) + cell(b) + '<td>' + fmt((a ? hhBal(a) : 0) + (b ? hhBal(b) : 0)) + '</td></tr>';
         }
         const stat = (plan, label, k) => {
@@ -5684,11 +5738,12 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<span class="note-text">' + (byExp ? 'The split comes from who pays each expense in your expense list.' : 'Automatic: in proportion to each person\'s expected retirement income (government benefits, pensions and 4% of savings). If one of you runs short while the other has money left over, change the split.') + '</span></div>'
             + stat(A, nm, 'me') + stat(B, ns, 'sp')
             + '<div class="hh-status">' + nm + ': QPP at age ' + A.q + ', OAS at age ' + A.o + '</div><div class="hh-status">' + ns + ': QPP at age ' + B.q + ', OAS at age ' + B.o + '</div>'
+            + hhPisBlock(fmt)
             + '<div class="hh-cards"><div class="hh-card"><small>Tax and OAS clawback over the plan</small><b>' + fmt(taxTot) + '</b><span>both of you</span></div>'
             + '<div class="hh-card"><small>Savings left at the end</small><b>' + fmt(endTot) + '</b><span>both of you</span></div></div>'
             + '<h3 class="section-title">Year by year, household view</h3>'
-            + '<div class="hh-tablewrap"><table class="hh-table"><thead><tr><th>Year</th><th>Ages</th><th>Spending need</th><th>Take-home</th><th>Tax</th><th><span>' + nm + '</span><br><small>takes out</small></th><th><span>' + ns + '</span><br><small>takes out</small></th><th>Savings left</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Pension income splitting and spousal rollover are not modeled. Each life event is split by the % entered on it (blank means the person who entered it pays all). Tap the You or Your spouse tab above for a full plan for one person.</span>';
+            + '<div class="hh-tablewrap"><table class="hh-table"><thead><tr><th>Year</th><th>Ages</th><th>Spending need</th><th>Take-home</th><th>Tax</th><th>Pension split</th><th><span>' + nm + '</span><br><small>takes out</small></th><th><span>' + ns + '</span><br><small>takes out</small></th><th>Savings left</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Spousal rollover is not modeled. Each life event is split by the % entered on it (blank means the person who entered it pays all). Tap the You or Your spouse tab above for a full plan for one person.</span>';
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     // Recommend the split of household spending that gives the best combined result (same scoring the optimizer uses).
