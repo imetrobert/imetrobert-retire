@@ -3988,7 +3988,7 @@ The numbers in that example are placeholders from a prior year — replace every
             let eventsThisYear = oneTimeEventsThisYear.concat(recurringEventsThisYear);
             let eventTotalThisYear = eventsThisYear.reduce((sum, e) => sum + e.amount * idxY, 0);
             let eventNamesThisYear = eventsThisYear.map(e => e.name || 'Unnamed event');
-            let eventDetailsThisYear = eventsThisYear.map(e => ({ name: e.name || 'Unnamed event', today: e.amount, future: e.amount * idxY, rec: recurringEventsThisYear.indexOf(e) >= 0 }));
+            let eventDetailsThisYear = eventsThisYear.map(e => ({ name: e.name || 'Unnamed event', today: e.amount, future: e.amount * idxY, rec: recurringEventsThisYear.indexOf(e) >= 0, share: (e._share === undefined ? null : e._share), full: (e._full === undefined ? null : e._full * idxY) }));
             let eventTfsaDraw = 0, eventNonRegDraw = 0, eventRegisteredNeed = 0;
             if (eventTotalThisYear > 0) {
                 let remaining = eventTotalThisYear;
@@ -4467,7 +4467,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function evMine(p, list) {
         const arr = list || [];
         if (p.hhRole || p.calcMode === 'couple' || p.livesAlone !== 'no') return arr;
-        return arr.map(e => { const v = parseFloat(e && e.pct); return (e && isFinite(v) && v >= 0 && v < 100) ? Object.assign({}, e, { amount: e.amount * v / 100 }) : e; });
+        return arr.map(e => { const v = parseFloat(e && e.pct); return (e && isFinite(v) && v >= 0 && v < 100) ? Object.assign({}, e, { amount: e.amount * v / 100, _full: e.amount, _share: v }) : e; });
     }
     function calculateRetirementPlanCore() {
         const p = hhActiveProfile || getProfileData();
@@ -5413,7 +5413,15 @@ The numbers in that example are placeholders from a prior year — replace every
                     // Which events this withdrawal pays for: shared in proportion to each event's cost this year.
                     const evDet = (r.eventDetailsThisYear && r.eventDetailsThisYear.length) ? r.eventDetailsThisYear : [{ name: (r.eventNamesThisYear || []).join(', ') || 'Life event', future: 1 }];
                     const evSum = evDet.reduce((t, e) => t + (e.future || 0), 0) || 1;
-                    evDet.forEach(e => { acctHtml += '<div class="yp-al" style="padding-left:14px;font-size:.92em;">' + escHtml(e.name) + ' <b>' + fmtNum(x.evt * (e.future || 0) / evSum) + '</b></div>'; });
+                    evDet.forEach(e => { acctHtml += '<div class="yp-al" style="padding-left:14px;font-size:.92em;">' + escHtml(e.name) + ' <b>' + fmtNum(x.evt * (e.future || 0) / evSum) + '</b></div>';
+                        // Shared event: say what part you cover and where the rest comes from (the Life events setup).
+                        if (e.share !== null && e.share !== undefined && e.share < 99.5 && e.full) {
+                            const otherK = p.hhKey === 'sp' ? 'me' : 'sp'; const who = p.hhKey ? (String((HH.names && HH.names[otherK]) || '').trim() || (otherK === 'me' ? 'you' : 'your spouse')) : 'your spouse or others';
+                            const whoTxt = who;
+                            acctHtml += '<div class="yp-al" style="padding-left:14px;font-size:.85em;color:#64748b;">You cover ' + Math.round(e.share) + '% of this event (total cost ' + fmtNum(e.full) + '). The other ' + Math.round(100 - e.share) + '% comes from ' + escHtml(whoTxt) + ', as set up on the Life events screen.</div>' +
+                                '<div class="yp-al" style="padding-left:14px;font-size:.85em;"><a href="#" onclick="event.preventDefault(); showStep(7);">Open Life events</a></div>';
+                        }
+                    });
                 }
                 if (has(x.tax)) acctHtml += '<div class="yp-al">Goes to tax <b>' + fmtNum(x.tax) + '</b></div>';
                 if (has(x.wd)) { const w = whOf(lbl); if (has(w)) acctHtml += '<div class="yp-al wht">The bank withholds ' + fmtNum(w) + ', which will automatically be used to pay part of your tax owed for the year. So you will receive ' + fmtNum(Math.max(0, x.wd - w)) + ' in pocket.' + (() => { const rest = Math.max(0, x.wd - w), need = Math.max(0, (x.tax || 0) - w); if (!has(need)) return ''; return need >= rest - 0.5 ? ' All of it is needed to pay the rest of your yearly tax bill, so set it aside.' : ' Of that, ' + fmtNum(need) + ' is needed to pay the rest of your yearly tax bill, so set it aside.'; })() + '</div>'; else if (has(x.tax)) acctHtml += '<div class="yp-al wht">There is no withholding tax, so put this money aside: it is needed to pay your tax bill.</div>'; }
@@ -5560,9 +5568,9 @@ The numbers in that example are placeholders from a prior year — replace every
         const go = (src, dstOwn, dstOther, shift, key) => (src[key] || []).forEach(e => {
             if (!(e && e.amount > 0)) return;
             const mine = Math.round(e.amount * pc(e)) / 100, rest = Math.round((e.amount - mine) * 100) / 100;
-            if (mine > 0) dstOwn[key].push(Object.assign({}, e, { amount: mine }));
+            if (mine > 0) dstOwn[key].push(Object.assign({}, e, { amount: mine, _full: e.amount, _share: pc(e) }));
             if (rest > 0) {
-                const o = Object.assign({}, e, { amount: rest });
+                const o = Object.assign({}, e, { amount: rest, _full: e.amount, _share: 100 - pc(e) });
                 if (key === 'events') o.age = e.age + shift; else { o.startAge = e.startAge + shift; o.endAge = e.endAge + shift; }
                 dstOther[key].push(o);
             }
@@ -5714,6 +5722,7 @@ The numbers in that example are placeholders from a prior year — replace every
         HH.shareMe = pct;
         const total = opts.total != null ? opts.total : me.spendAmount, freq = opts.freq || me.spendFrequency;
         const out = { me: hhMk(me, pct, total, freq, 'You'), sp: hhMk(sp, 100 - pct, total, freq, 'Your spouse') };
+        out.me.hhKey = 'me'; out.sp.hhKey = 'sp';
         const ev = hhShareEvents(me, sp);
         out.me.events = ev.a.events; out.me.recurringEvents = ev.a.recurringEvents; out.sp.events = ev.b.events; out.sp.recurringEvents = ev.b.recurringEvents;
         return out;
