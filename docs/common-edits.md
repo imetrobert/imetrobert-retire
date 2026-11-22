@@ -101,6 +101,12 @@ Step 1 asks "Are you filling this out for you, or for you and a spouse?". Choosi
 - Spousal rollover: block `// ---- Spousal rollover` (`hhRollover`). The plan with fewer rows is the first death; its end balances (`run.endState`) are added to the survivor's accounts in the engine through `p.hhSurv` (and the deceased's estate tax is skipped via `p.hhRollover`); the survivor then covers `HH.survPct`% (default 75) of household spending. Switch `HH.roll` (saved as `hhRoll`, `hhSurvPct`). Not modeled: QPP/CPP survivor benefits and employer-pension survivor payments. Test: `scripts/test_household.py`.
 - Test: `python3 scripts/test_household.py` (runs in Checks).
 
+## Year view: which events an account pays for
+- In `yearCardsHtml` (grep `Goes to life events`) each account block lists the year's events by name under that line. The names and costs come from `r.eventDetailsThisYear` (set in the simulation next to `eventNamesThisYear`; each item has name, today, future, rec). An account's event amount (`x.evt`) is shared across events in proportion to each event's cost that year, the same rule as the "How each dollar is used" view. The engine does not track which dollar paid which event.
+
+## Saving and cloud status (wording)
+- Results screen: "Save on this device" (`saveProfileAndResults`) and "Save on device and cloud" (`saveToBoth`). The device list (`renderProfileManager`) shows JUST SAVED / LATEST SAVE and a green / orange / grey cloud line per scenario with a "Sync to cloud" button (`window.awrSyncPlan` in `account.js`). The status compares a fingerprint (`planSig`) stored at the last cloud save from this device (`<profiles key>_cloudsync`); it cannot see saves made from another device. Save / Cancel bars: expense sheet (`.exp-save`) and Life events (`#evBar`).
+
 ## Menu and saved copies (wording)
 - Planner menu rows are in `#toolMenu` in `index.html` (Life events, Expenses, Saved on this device, ...); the account rows (My plans (cloud), Documentation, Sign out) are added by `account.js` (`refreshMenu`). There is no floating account button any more: My plans opens from the menu only.
 - "Saved on this device" = scenarios in this browser's localStorage (`showProfileManager`); "My plans (cloud)" = encrypted copies in the user's account. Keep these two names distinct everywhere.
