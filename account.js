@@ -54,7 +54,7 @@
       noCrypto: 'This browser cannot encrypt here. Open the page over https in a current browser.', saveFail: 'Could not save. Check your connection and try again.',
       soTitle: 'Sign out', soText: 'Your Saved on this device copies and the plan in the form can stay on this phone, or be removed. Plans in My plans (cloud) are never affected.', soSure: 'Tap again to delete the device copies', soKeep: 'Sign out, keep device plans', soClear: 'Sign out and clear device plans', cancel: 'Cancel',
       welcome: 'Welcome {email} to your retirement planner', docsLink: 'Read the documentation',
-      loggedIn: 'Logged in as {email}', docsMenu: 'Documentation', docsSub: 'User guide (PDF)', plansSub: 'Open your scenarios on any device with your passphrase',
+      loggedIn: 'Logged in as {email}', docsMenu: 'Documentation', docsSub: 'User guide (PDF)', plansSub: 'Save and open your scenarios on any device with your passphrase',
       lang: 'Français'
     },
     fr: {
