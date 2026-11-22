@@ -478,7 +478,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
         <button type="button" class="menu-item" onclick="closeMenu(); showStep(7)"><span class="mi-ico">🎉</span><span>Life events<small>One-time and yearly costs</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); openExpenses()"><span class="mi-ico">🧾</span><span>Expenses<small>(if you need it to calculate your regular spend needs)</small></span></button>
         <div class="menu-note">Two ways to save your scenarios</div>
-        <button type="button" class="menu-item" onclick="closeMenu(); showProfileManager()"><span class="mi-ico">📁</span><span>Save on this device<small>Reopen your scenarios any time on this device</small></span></button>
+        <button type="button" class="menu-item" onclick="closeMenu(); showProfileManager()"><span class="mi-ico">📁</span><span>Save / load scenarios on this device<small>Reopen your scenarios any time on this device</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); showTaxRulesPanel()"><span class="mi-ico">⚙️</span><span>Tax &amp; benefit rules<small>Brackets, credits, OAS, RRIF factors</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); startNewScenario()"><span class="mi-ico">🆕</span><span>New scenario<small>Start again from a blank form</small></span></button>
         <div class="menu-note" id="mainRulesDateLabel"></div>
@@ -1031,7 +1031,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
         <div class="question-step" data-step="5">
 
             <div class="step-head"><div class="eyebrow">Saved</div><h2>Saved on this device</h2></div>
-            <div class="ai-card" id="deviceNote"><p><strong>Two ways to save your scenarios.</strong></p><p><strong>On this device:</strong> the copies below stay in this browser on this device. You can reopen them any time here, but if you clear your browser data they are gone.</p><p><strong>In the cloud:</strong> use it to keep your scenarios safe and open them on any device. They are encrypted, and you open them with your passphrase.</p><button type="button" class="secondary" onclick="var m = document.getElementById('awr-mi-plans'); if (m) m.click();">Open Save in the cloud</button></div>
+            <div class="ai-card" id="deviceNote"><p><strong>Two ways to save your scenarios.</strong></p><p><strong>On this device:</strong> the copies below stay in this browser on this device. You can reopen them any time here, but if you clear your browser data they are gone.</p><p><strong>In the cloud:</strong> use it to keep your scenarios safe and open them on any device. They are encrypted, and you open them with your passphrase.</p><button type="button" class="secondary" onclick="var m = document.getElementById('awr-mi-plans'); if (m) m.click();">Open scenarios in the cloud</button></div>
             <div class="results-box" id="profileListContainer">
                 <p>No saved profiles found.</p>
             </div>
