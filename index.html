@@ -3902,8 +3902,8 @@ The numbers in that example are placeholders from a prior year — replace every
                 : (p.nonRegCapitalGainsPct / 100);
             cgRatio = nonRegGainFrac * 0.50;
 
-            let oneTimeEventsThisYear = (p.events || []).filter(e => e.age === currentAgeSim && e.amount > 0);
-            let recurringEventsThisYear = (p.recurringEvents || []).filter(re => re.amount > 0 && re.startAge > 0 && currentAgeSim >= re.startAge && currentAgeSim <= re.endAge);
+            let oneTimeEventsThisYear = evMine(p, p.events).filter(e => e.age === currentAgeSim && e.amount > 0);
+            let recurringEventsThisYear = evMine(p, p.recurringEvents).filter(re => re.amount > 0 && re.startAge > 0 && currentAgeSim >= re.startAge && currentAgeSim <= re.endAge);
             let eventsThisYear = oneTimeEventsThisYear.concat(recurringEventsThisYear);
             let eventTotalThisYear = eventsThisYear.reduce((sum, e) => sum + e.amount * idxY, 0);
             let eventNamesThisYear = eventsThisYear.map(e => e.name || 'Unnamed event');
@@ -4382,6 +4382,12 @@ The numbers in that example are placeholders from a prior year — replace every
         };
     }
 
+    // living with others but planning just for me: only my % of each life event counts (household plans are split elsewhere: hhShareEvents)
+    function evMine(p, list) {
+        const arr = list || [];
+        if (p.hhRole || p.calcMode === 'couple' || p.livesAlone !== 'no') return arr;
+        return arr.map(e => { const v = parseFloat(e && e.pct); return (e && isFinite(v) && v >= 0 && v < 100) ? Object.assign({}, e, { amount: e.amount * v / 100 }) : e; });
+    }
     function calculateRetirementPlanCore() {
         const p = hhActiveProfile || getProfileData();
         const taxRules = getTaxRules();
@@ -5432,22 +5438,32 @@ The numbers in that example are placeholders from a prior year — replace every
     // ---- Information pop-ups: long notes become a small "More info" button that opens a bottom sheet ----
     // ---- Household mode: who pays each life event (blank = the person filling in this form pays all) ----
     function hhPctVal(id) { const el = document.getElementById(id); if (!el || el.value === '') return null; const v = parseFloat(el.value); return isFinite(v) ? Math.min(100, Math.max(0, v)) : null; }
-    function hhSetPct(id, v) { const el = document.getElementById(id); if (el) el.value = (v === null || v === undefined || v === '') ? '' : v; }
+    function hhSetPct(id, v) {
+        const el = document.getElementById(id); if (el) el.value = (v === null || v === undefined || v === '') ? '' : v;
+        const o = document.getElementById(id + 'O'); if (o) o.value = (v === null || v === undefined || v === '' || !isFinite(parseFloat(v))) ? '' : String(Math.round((100 - parseFloat(v)) * 100) / 100);
+    }
     function hhEnsureEventPct() {
         [['event', 'Amount'], ['recur', 'Amount']].forEach(k => {
             for (let n = 1; n <= 10; n++) {
                 if (document.getElementById(k[0] + n + 'Pct')) continue;
                 const amt = document.getElementById(k[0] + n + k[1]), card = amt && amt.closest('.asset-row'); if (!card) continue;
                 const d = document.createElement('div'); d.className = 'hh-evpct'; d.hidden = true;
-                d.innerHTML = '<label for="' + k[0] + n + 'Pct">Share you pay (%)</label><input type="number" id="' + k[0] + n + 'Pct" min="0" max="100" step="any" placeholder="Blank = you pay all">';
+                d.innerHTML = '<label for="' + k[0] + n + 'Pct">Share you pay (%)</label><input type="number" id="' + k[0] + n + 'Pct" min="0" max="100" step="any" placeholder="Blank = you pay all">'
+                    + '<label for="' + k[0] + n + 'PctO" class="hh-evo">Spouse / others (%)</label><input type="number" id="' + k[0] + n + 'PctO" min="0" max="100" step="any" placeholder="0">';
                 card.appendChild(d);
+                const mine = d.querySelector('#' + k[0] + n + 'Pct'), oth = d.querySelector('#' + k[0] + n + 'PctO'); let busy = false;
+                mine.addEventListener('input', () => { if (busy) return; const v = hhPctVal(mine.id); oth.value = v === null ? '' : String(Math.round((100 - v) * 100) / 100); });
+                oth.addEventListener('input', () => { const v = hhPctVal(oth.id); busy = true; mine.value = v === null ? '' : String(Math.round((100 - v) * 100) / 100); mine.dispatchEvent(new Event('input', { bubbles: true })); mine.dispatchEvent(new Event('change', { bubbles: true })); busy = false; });
             }
         });
         const st = document.querySelector('.question-step[data-step="7"]');
         if (st && !document.getElementById('hhEvNote')) {
             const nt = document.createElement('span'); nt.className = 'note-text hh-evpct'; nt.id = 'hhEvNote'; nt.hidden = true;
-            nt.textContent = 'Household: for each event, enter the % you pay. Leave it blank and you pay all of it; the rest is paid by your spouse in the same year.';
+            nt.textContent = 'For each event, enter the % you pay. The other box shows the rest (spouse or others) and adjusts with it. Leave it blank and you pay all of it. Only your share is counted in your plan.';
             const head = st.querySelector('.step-head'); if (head) head.insertAdjacentElement('afterend', nt); else st.insertBefore(nt, st.firstChild);
+            const ob = document.createElement('div'); ob.className = 'hh-evopt'; ob.id = 'hhEvOpt'; ob.hidden = true;
+            ob.innerHTML = '<button type="button" class="secondary" onclick="hhRecommendEvents()">Recommend an optimized split of these events</button><div class="exp-rec" id="hhEvRec"></div>';
+            nt.insertAdjacentElement('afterend', ob);
         }
     }
     function hhShareEvents(A, B) {   // returns {a: {events, recurringEvents}, b: {...}}: each event split between the two plans
@@ -5487,7 +5503,7 @@ The numbers in that example are placeholders from a prior year — replace every
             + '.hh-cards{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hh-card{flex:1 1 30%;min-width:96px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px}.hh-card small{display:block;color:#64748b;font-size:11px}.hh-card b{display:block;font-size:17px;color:#0f172a}.hh-card span{font-size:11px;color:#64748b}'
             + '.hh-split{margin:8px 0}.hh-split input{width:110px;display:inline-block;margin:0 6px}.hh-status{margin:4px 0;font-size:13px}'
             + '.hh-tablewrap{overflow-x:auto;margin:8px 0}.hh-table{border-collapse:collapse;width:100%;min-width:640px;font-size:12px}.hh-table th,.hh-table td{border-bottom:1px solid #e2e8f0;padding:5px 6px;text-align:right;vertical-align:top}.hh-table th{background:#f1f5f9;position:sticky;top:0}.hh-table td:first-child,.hh-table th:first-child{text-align:left}.hh-table td small{display:block;color:#64748b;font-size:10.5px;white-space:nowrap}.hh-table td small i{font-style:normal}.hh-table tr.hh-short td{background:#fff7ed}'
-            + '#expSheet .exp-row .ep{flex:0 0 62px}#expSheet .exp-row .ep2{display:flex;gap:6px;flex:1 1 150px;min-width:0}#expSheet .ep2 label{display:flex;flex-direction:column;font-size:11px;margin:0;flex:1 1 0;min-width:0;color:#475569}#expSheet .ep2 .ep{flex:1 1 auto;width:100%;margin:0}#expSheet .exp-note[hidden]{display:none}#expSheet .exp-tot[hidden]{display:none}#expSheet .exp-rec{font-size:13px;color:#1e3a8a;margin:6px 0}';
+            + '#expSheet .exp-row .ep{flex:0 0 62px}#expSheet .exp-row .ep2{display:flex;gap:6px;flex:1 1 150px;min-width:0}#expSheet .ep2 label{display:flex;flex-direction:column;font-size:11px;margin:0;flex:1 1 0;min-width:0;color:#475569}#expSheet .ep2 .ep{flex:1 1 auto;width:100%;margin:0}#expSheet .exp-note[hidden]{display:none}.hh-evopt[hidden],.hh-evpct[hidden]{display:none}.hh-evopt{margin:6px 0}#expSheet .exp-tot[hidden]{display:none}#expSheet .exp-rec{font-size:13px;color:#1e3a8a;margin:6px 0}';
         document.head.appendChild(st);
     })();
     function hhIsCouple() { const c = document.getElementById('calcMode'); return !!c && c.value === 'couple'; }
@@ -5558,7 +5574,13 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('hhNote2').textContent = HH.legacy ? 'Your spouse\'s form was built from your earlier joint entries. Please review it.' : '';
         document.getElementById('hhNote3').textContent = HH.legacy === 'pension' ? 'An employer pension for your spouse was not carried over: enter it in their form.' : '';
         const nr = document.getElementById('hhNamesRow'); if (nr) nr.hidden = !couple;
-        document.querySelectorAll('.hh-evpct').forEach(d => { d.hidden = !couple; });
+        {
+            const la = document.getElementById('livesAlone'), evShow = couple || (!!la && la.value === 'no');
+            document.querySelectorAll('.hh-evpct').forEach(d => { d.hidden = !evShow; });
+            document.querySelectorAll('.hh-evopt').forEach(d => { d.hidden = !couple; });
+            const ol = couple ? (sp ? hhLabel('me') : hhLabel('sp')) : 'Spouse / others';
+            document.querySelectorAll('label.hh-evo').forEach(l => { l.textContent = ol + ' (%)'; });
+        }
         ['hhTabsMe', 'hhTabsSp'].forEach((id, i) => { const b = document.getElementById(id); if (b) b.textContent = hhLabel(i ? 'sp' : 'me'); });
         HH_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = sp; });
         if (!sp && typeof expSync === 'function') expSync();
@@ -5824,6 +5846,39 @@ The numbers in that example are placeholders from a prior year — replace every
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     function hhPctClamp(v) { const n = parseFloat(v); return isFinite(n) ? Math.min(100, Math.max(0, n)) : null; }
+    function hhOptimizeEvents() {
+        const rules = getTaxRules(), flat = p => (p.returnModel === 'montecarlo' ? Object.assign({}, p, { returnModel: 'flat', returnPost: p.mcAvgReturn }) : p);
+        const base = hhPlanProfiles(), owner = HH.who === 'spouse' ? 'spouse' : 'me';
+        const A = HH.me, B = Object.assign({}, HH.spouse, hhPick(HH.me), { calcMode: 'couple' });
+        const own = owner === 'me' ? A : B;
+        const n = ['events', 'recurringEvents'].reduce((t, k) => t + (own[k] || []).filter(e => e && e.amount > 0).length, 0);
+        if (!n) return null;
+        const ca = hhChooseAges(flat(base.me), rules), cb = hhChooseAges(flat(base.sp), rules);
+        const ev = q => {
+            const a = hhClone(A), b = hhClone(B), t = owner === 'me' ? a : b;
+            if (q !== null) ['events', 'recurringEvents'].forEach(k => (t[k] || []).forEach(e => { e.pct = q; }));
+            const sh = hhShareEvents(a, b);
+            const pa = flat(Object.assign({}, base.me, { events: sh.a.events, recurringEvents: sh.a.recurringEvents })), pb = flat(Object.assign({}, base.sp, { events: sh.b.events, recurringEvents: sh.b.recurringEvents }));
+            const ra = runSimulation(pa, ca.q, ca.o, rules), rb = runSimulation(pb, cb.q, cb.o, rules);
+            const sc = r => (r.depletionAge === null ? 1e6 : r.depletionAge * 1e4) + r.finalPortfolio - r.totalTaxesPaid * 0.2;
+            return { score: sc(ra) + sc(rb), tax: ra.totalTaxesPaid + ra.totalClawback + rb.totalTaxesPaid + rb.totalClawback };
+        };
+        let best = null;
+        for (let q = 0; q <= 100; q += 10) { const e = ev(q); if (!best || e.score > best.score) best = Object.assign({ pct: q }, e); }
+        for (let q = Math.max(0, best.pct - 9); q <= Math.min(100, best.pct + 9); q++) { const e = ev(q); if (e.score > best.score) best = Object.assign({ pct: q }, e); }
+        const cur = ev(null);
+        return { pct: best.pct, tax: best.tax, taxCur: cur.tax, better: best.score > cur.score + 1 };
+    }
+    function hhRecommendEvents() {
+        const out = document.getElementById('hhEvRec');
+        if (!HH.visited) { out.textContent = 'Fill in your spouse\'s details first (tap their name at the top of the page), then come back for a recommendation.'; return; }
+        let r; try { r = hhOptimizeEvents(); } catch (e) { out.textContent = 'Could not work out a recommendation yet. Check both forms are filled in.'; return; }
+        if (!r) { out.textContent = 'Add at least one life event with an amount first.'; return; }
+        for (let n = 1; n <= 10; n++) ['event', 'recur'].forEach(k => { const am = document.getElementById(k + n + 'Amount'); if (am && parseFloat(am.value) > 0) { hhSetPct(k + n + 'Pct', r.pct); const m = document.getElementById(k + n + 'Pct'); m.dispatchEvent(new Event('change', { bubbles: true })); } });
+        const save = r.taxCur - r.tax;
+        out.textContent = 'Recommended: you pay ' + r.pct + '% of the events on this form.' + (r.better && save > 50 ? ' Estimated tax and clawback saved over the plan, compared with your current split: $' + Math.round(save).toLocaleString() + '.' : ' About the same tax as your current split.');
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
     function hhExpPctInput(it) {
         if (!hhIsCouple() && !expShareMode()) return null;
         {   // two linked boxes: what each person pays of this expense always adds up to 100% (alone mode: me and my spouse / others)
@@ -5941,7 +5996,7 @@ The numbers in that example are placeholders from a prior year — replace every
         if (typeof updateSpendFrequencyLabel === 'function') updateSpendFrequencyLabel();
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
-    (function () { const la = document.getElementById('livesAlone'); if (la) la.addEventListener('change', function () { expSync(); }); })();
+    (function () { const la = document.getElementById('livesAlone'); if (la) la.addEventListener('change', function () { expSync(); if (typeof hhUi === 'function') hhUi(); }); })();
     function expStop() {
         const s = expState(); s.on = false; expDraft = null; closeExp(); expSync();
         const amt = document.getElementById('spendAmount');
