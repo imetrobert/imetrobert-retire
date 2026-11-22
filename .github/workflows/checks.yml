@@ -25,6 +25,7 @@ jobs:
           pip install playwright
           python3 -m playwright install --with-deps chromium
           python3 scripts/test_account.py
+          python3 scripts/test_tax.py
           python3 scripts/test_statements.py
       - name: Refresh the code map
         run: python3 scripts/code_map.py
