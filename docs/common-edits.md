@@ -58,3 +58,21 @@ Run `python3 scripts/check_planner.py`: it names a syntax error or duplicate id.
 Edit `account.js` only (texts are in `T`, English and French). Keep: encryption before upload, no secret keys,
 no innerHTML. Run `python3 scripts/test_account.py`. `CFG.docs` is blank (no guide here); set it to show a documentation link.
 The same change usually belongs in the other planner's `account.js` too.
+
+## 11. Government statements (read a PDF and fill a field)
+`statements.js` + `vendor/pdfjs/` (self-hosted pdf.js, loaded only when a PDF is picked). The page block is
+`<details id="stmtShortcut">` in step 1. The file is read in the browser only: no network call, nothing saved
+(`check_planner.py` fails if `statements.js` names a web address or calls fetch).
+- Today it reads the Retraite Québec Statement of Participation, section A ("Estimate of the amount of your
+  retirement pension (monthly)": two rows, "continue contributing" / "stopped today", amounts at age 60 and 65)
+  and fills `qppMonthlyAmt` (or `spouseQppMonthlyAmt`) after a Preview and a tap on Apply. Layout source: the
+  public example on retraitequebec.gouv.qc.ca ("Statement of Participation under the QPP").
+- If Retraite Québec changes wording: edit `START_RX`, `END_RX`, `KIND_CONT`, `KIND_STOP` at the top of the
+  QPP block in `statements.js`. Unknown layouts still work through the "Pick the number yourself" list.
+- New statement type (OAS, CPP, a tax slip): copy `parseQpp()` into `parseXxx()`, add its fixture to
+  `scripts/make_fake_statements.py` (FAKE data only; this repo is public), add a case to
+  `scripts/test_statements.py`, and add the French text to `TXT.fr`.
+- Never commit a real statement. Test with `python3 scripts/make_fake_statements.py` then
+  `python3 scripts/test_statements.py` (needs `pip install playwright reportlab`).
+- Screenshots and scans are NOT read (no OCR yet); the message asks for the PDF.
+
