@@ -558,6 +558,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <select id="spendFrequency" onchange="updateSpendFrequencyLabel()">
                 <option value="monthly">Monthly</option>
                 <option value="weekly">Weekly</option>
+                <option value="yearly">Yearly</option>
             </select>
             <label id="spendAmountLabel" for="spendAmount">Spending you want each month, after tax ($)</label>
             <input type="number" id="spendAmount" value="4000" step="100">
@@ -2706,13 +2707,8 @@ The numbers in that example are placeholders from a prior year — replace every
 
     function updateSpendFrequencyLabel() {
         const freq = document.getElementById('spendFrequency').value;
-        const isWeekly = freq === 'weekly';
-        document.getElementById('spendAmountLabel').innerText = isWeekly
-            ? 'Spending you want each week, after tax ($)'
-            : 'Spending you want each month, after tax ($)';
-        document.getElementById('spendFrequencyNote').innerText = isWeekly
-            ? 'Today\'s dollars. We turn it into a yearly amount.'
-            : 'Today\'s dollars. We turn it into a yearly amount.';
+        document.getElementById('spendAmountLabel').innerText = 'Spending you want each ' + freqWord(freq) + ', after tax ($)';
+        document.getElementById('spendFrequencyNote').innerText = 'Today\'s dollars. We turn it into a yearly amount.';
     }
 
     function toggleRlifBlock() {
@@ -3058,8 +3054,8 @@ The numbers in that example are placeholders from a prior year — replace every
             targetAge: document.getElementById('alreadyRetired').checked ? (parseFloat(document.getElementById('currentAge').value) || 0) : (parseFloat(document.getElementById('targetAge').value) || 0),
             spouseAge: parseFloat(document.getElementById('spouseAge').value) || 0,
             spendFrequency: document.getElementById('spendFrequency').value,
-            spendAmount: expState().on ? expTotal(EXP.items) : (parseFloat(document.getElementById('spendAmount').value) || 0),
-            expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount, pct: (i.pct === undefined ? null : i.pct) })),
+            spendAmount: expState().on ? expSpend(EXP.items, EXP.freq) : (parseFloat(document.getElementById('spendAmount').value) || 0),
+            expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount, freq: i.freq, pct: (i.pct === undefined ? null : i.pct) })),
 
             currentRrsp: parseFloat(document.getElementById('currentRrsp').value) || 0,
             contribRrsp: parseFloat(document.getElementById('contribRrsp').value) || 0,
@@ -3271,7 +3267,7 @@ The numbers in that example are placeholders from a prior year — replace every
                         ${isRenaming
                             ? `<input type="text" id="renameInput" maxlength="60" value="${escHtml(p.name || '')}" placeholder="Scenario name" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:6px;">`
                             : `<strong>${title}</strong><br>`}
-                        <small style="color:#64748b;">${kind} | Saved: ${escHtml(p.timestamp || '')} | Net spend: $${escHtml(p.spendAmount)}/${p.spendFrequency === 'weekly' ? 'wk' : 'mo'} | Retire age: ${escHtml(p.targetAge)}</small>
+                        <small style="color:#64748b;">${kind} | Saved: ${escHtml(p.timestamp || '')} | Net spend: $${escHtml(p.spendAmount)}/${freqShort(p.spendFrequency)} | Retire age: ${escHtml(p.targetAge)}</small>
                         <br><small style="color:${p.savedExplicitly ? '#166534' : '#a16207'};">${p.savedExplicitly ? '✓ Saved by you' : 'Auto-saved draft'}${p.results ? ' | ' + escHtml(resultsLine(p.results)) : ''}</small>
                     </div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -3383,8 +3379,12 @@ The numbers in that example are placeholders from a prior year — replace every
     // weekly figure — everything downstream works off the annualized total
     // and the number of payout periods per year.
     function getPeriodsPerYear(p) {
-        return p.spendFrequency === 'weekly' ? 52 : 12;
+        return freqMult(p.spendFrequency);
     }
+    // weekly / monthly / yearly helpers (spending target and expense rows)
+    function freqMult(f) { return f === 'weekly' ? 52 : f === 'yearly' ? 1 : 12; }
+    function freqWord(f) { return f === 'weekly' ? 'week' : f === 'yearly' ? 'year' : 'month'; }
+    function freqShort(f) { return f === 'weekly' ? 'wk' : f === 'yearly' ? 'yr' : 'mo'; }
     function getAnnualNetNeed(p) {
         return p.spendAmount * getPeriodsPerYear(p);
     }
@@ -4537,7 +4537,7 @@ The numbers in that example are placeholders from a prior year — replace every
             <p><strong>Tax Engine:</strong> Combined Federal &amp; Quebec progressive brackets with proper non-refundable credits (BPA, age amount, pension income amount) and the 16.5% Quebec federal abatement — rates dated ${taxRules.verifiedDate}. Edit anytime via "⚙️ Tax &amp; Benefit Rules".</p>
             <p><strong>Selected Start Ages:</strong> Your QPP Age <span class="highlight">${chosenQppAge}</span> | Your OAS Age <span class="highlight">${chosenOasAge}</span>${p.calcMode === 'couple' ? ` | Spouse QPP Age <span class="highlight">${p.spouseQppStartAge}</span> | Spouse OAS Age <span class="highlight">${p.spouseOasStartAge}</span>` : ''}</p>
             <p><strong>Retirement Horizon:</strong> ${p.alreadyRetired ? `<strong>Already retired</strong> — projecting from age ${p.targetAge}` : `In <strong>${yearsToRet} years</strong> at age ${p.targetAge}`} (Duration: ${retDuration} yrs to age ${p.lifeExpectancy}).</p>
-            <p><strong>Target Annual Net Take-Home Spend:</strong> <span class="highlight">$${getAnnualNetNeed(p).toLocaleString()} / year</span> ($${p.spendAmount.toLocaleString()}/${p.spendFrequency === 'weekly' ? 'wk' : 'mo'}, paid out ${p.spendFrequency})</p>
+            <p><strong>Target Annual Net Take-Home Spend:</strong> <span class="highlight">$${getAnnualNetNeed(p).toLocaleString()} / year</span> ($${p.spendAmount.toLocaleString()}/${freqShort(p.spendFrequency)}, paid out ${p.spendFrequency})</p>
             <p><strong>Total Estimated Lifetime Tax (illustrative path):</strong> $${Math.round(finalRun.totalTaxesPaid).toLocaleString()}${inflationOnForSummary ? ' (≈ $' + Math.round(finalRun.totalTaxesPaidToday).toLocaleString() + ' in today\'s dollars)' : ''} | <strong>Total Estimated OAS Clawback:</strong> $${Math.round(finalRun.totalClawback).toLocaleString()}</p>
             <p>🏡 <strong>Estate at age ${finalRun.taxAtDeath.age}:</strong> portfolio $${Math.round(finalRun.taxAtDeath.portfolioAtEnd).toLocaleString()} → estimated tax at death $${Math.round(finalRun.taxAtDeath.taxAtDeath).toLocaleString()} (${(finalRun.taxAtDeath.effectiveRate * 100).toFixed(0)}% of the $${Math.round(finalRun.taxAtDeath.deemedIncome).toLocaleString()} taxable at death — registered accounts plus non-registered gains; the TFSA passes tax-free) → <strong>about $${Math.round(finalRun.taxAtDeath.afterTaxEstate).toLocaleString()} left for family</strong>${inflationOnForSummary ? ' (≈ $' + Math.round(finalRun.taxAtDeath.afterTaxEstateToday).toLocaleString() + ' in today\'s dollars)' : ''}.</p>
             ${inflationSummaryHtml}
@@ -4948,7 +4948,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const avg = p0.returnModel === 'montecarlo' ? p0.mcAvgReturn : p0.returnPost;
         const vol = p0.mcVolatility > 0 ? p0.mcVolatility : 8;
         const base = p0.spendAmount;
-        const unit = p0.spendFrequency === 'weekly' ? 'week' : 'month';
+        const unit = freqWord(p0.spendFrequency);
         const fmt = (v) => '$' + Math.round(v).toLocaleString();
         const mk = (f, over) => Object.assign({}, p0, { spendAmount: base * f }, over);
         const yieldUi = () => new Promise(r => setTimeout(r, 15));
@@ -5395,7 +5395,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const shortfall = finalRun.scheduleRows.find(r => r.age <= p.lifeExpectancy &&
             r.actualNetTakeHome < ((r.targetSpend ?? annualTarget) + (r.eventTotalThisYear || 0)) * 0.98);
         const short = !!shortfall;
-        const spendTxt = fmtNum(p.spendAmount) + '/' + (p.spendFrequency === 'weekly' ? 'week' : 'month');
+        const spendTxt = fmtNum(p.spendAmount) + '/' + freqWord(p.spendFrequency);
         const sumRows = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
         const te = finalRun.taxAtDeath;
         const estate = (infl && p.showRealDollars) ? te.afterTaxEstateToday : te.afterTaxEstate;
@@ -5586,7 +5586,7 @@ The numbers in that example are placeholders from a prior year — replace every
         if (!me.expenseOn || !Array.isArray(me.expenseItems)) return null;
         if (!me.expenseItems.some(i => i && i.pct !== null && i.pct !== undefined && i.pct !== '')) return null;
         let tot = 0, mine = 0;
-        me.expenseItems.forEach(i => { const a = parseFloat(i.amount) || 0, pc = (i.pct === null || i.pct === undefined || i.pct === '') ? autoPct : parseFloat(i.pct); tot += a; mine += a * Math.min(100, Math.max(0, pc)) / 100; });
+        me.expenseItems.forEach(i => { const a = (parseFloat(i.amount) || 0) * expMult(expFreqOf(i, me.expenseFreq)), pc = (i.pct === null || i.pct === undefined || i.pct === '') ? autoPct : parseFloat(i.pct); tot += a; mine += a * Math.min(100, Math.max(0, pc)) / 100; });
         return tot > 0 ? 100 * mine / tot : null;
     }
     function hhMk(p, pct, total, freq, role) {
@@ -5808,12 +5808,12 @@ The numbers in that example are placeholders from a prior year — replace every
     }
     function hhRecommendSplit() {
         const out = document.getElementById('expRec');
-        const idx = expDraft.items.map((it, i) => ({ i: i, a: parseFloat(it.amount) || 0 })).filter(x => x.a > 0).sort((x, y) => y.a - x.a);
+        const idx = expDraft.items.map((it, i) => ({ i: i, a: (parseFloat(it.amount) || 0) * expMult(expFreqOf(it, expDraft.freq)) })).filter(x => x.a > 0).sort((x, y) => y.a - x.a);
         if (!idx.length) { out.textContent = 'Add at least one expense with an amount first.'; return; }
         if (!HH.visited) { out.textContent = 'Fill in your spouse\'s details first (tap their name at the top of the page), then come back for a recommendation.'; return; }
         const total = idx.reduce((s, x) => s + x.a, 0);
         let r;
-        try { r = hhOptimizeSplit(total, expDraft.freq); } catch (e) { out.textContent = 'Could not work out a recommendation yet. Check both forms are filled in.'; return; }
+        try { r = hhOptimizeSplit(total / expMult(expDraft.freq), expDraft.freq); } catch (e) { out.textContent = 'Could not work out a recommendation yet. Check both forms are filled in.'; return; }
         let remain = total * r.pct / 100;
         idx.forEach(x => { let pc; if (remain >= x.a - 0.005) { pc = 100; remain -= x.a; } else if (remain > 0) { pc = Math.round(remain / x.a * 100); remain = 0; } else pc = 0; expDraft.items[x.i].pct = pc; });
         expRender();
@@ -5874,25 +5874,30 @@ The numbers in that example are placeholders from a prior year — replace every
             + '#expSheet{position:fixed;inset:0;z-index:9998;display:none}#expSheet.open{display:block}#expSheet .bd{position:absolute;inset:0;background:rgba(15,23,42,.5)}'
             + '#expSheet .sh{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25)}'
             + '#expSheet h3{margin:0 0 8px}#expSheet .exp-note{display:block;font-size:13px;line-height:1.45;color:#475569;margin:0 0 8px}'
-            + '#expSheet .exp-row{display:flex;gap:6px;align-items:center;margin:0 0 6px}#expSheet .exp-row input{margin:0;min-width:0;width:auto}#expSheet .exp-row .en{flex:1 1 auto}#expSheet .exp-row .ea{flex:0 0 104px}'
+            + '#expSheet .exp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}#expSheet .exp-row .ef{flex:0 0 104px;margin:0;min-width:0;width:auto}#expSheet .exp-row input{margin:0;min-width:0;width:auto}#expSheet .exp-row .en{flex:1 1 100%}#expSheet .exp-row .ea{flex:1 1 90px}'
             + '#expSheet .exp-row button{flex:0 0 40px;min-height:40px;padding:0}#expSheet .exp-tot{display:flex;justify-content:space-between;align-items:center;margin:10px 0;padding:10px 12px;border-radius:12px;background:#eff6ff;font-weight:700;color:#1e3a8a}'
             + '#expSheet .exp-tot[hidden]{display:none}'
             + '#expSheet .exp-err{color:#b91c1c;font-size:13px;margin:6px 0}#expSheet .exp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}';
         document.head.appendChild(st);
     })();
     function expState() { if (!EXP || !Array.isArray(EXP.items)) EXP = { on: false, freq: 'monthly', items: [] }; return EXP; }
-    function expTotal(items) { let t = 0; (items || []).forEach(i => { t += Math.max(0, parseFloat(i && i.amount) || 0); }); return Math.round(t * 100) / 100; }
-    function expClean(items) {
-        return (Array.isArray(items) ? items : []).map(i => ({ name: String((i && i.name) || '').slice(0, 60), amount: Math.max(0, parseFloat(i && i.amount) || 0), pct: (i && i.pct !== null && i.pct !== undefined && i.pct !== '' && isFinite(parseFloat(i.pct))) ? Math.min(100, Math.max(0, parseFloat(i.pct))) : null }))
+    function expMult(f) { return f === 'weekly' ? 52 : f === 'yearly' ? 1 : 12; }
+    function expFreqOf(i, fallback) { return (i && (i.freq === 'weekly' || i.freq === 'monthly' || i.freq === 'yearly')) ? i.freq : (fallback === 'weekly' || fallback === 'yearly' ? fallback : 'monthly'); }
+    // total of the list in the unit 'unit' (monthly/weekly/yearly): every row is converted from its own frequency
+    function expTotal(items, unit) { let t = 0; (items || []).forEach(i => { t += Math.max(0, parseFloat(i && i.amount) || 0) * expMult(expFreqOf(i, unit)); }); return Math.round(t / expMult(unit) * 100) / 100; }
+    function expClean(items, fallback) {
+        return (Array.isArray(items) ? items : []).map(i => ({ name: String((i && i.name) || '').slice(0, 60), amount: Math.max(0, parseFloat(i && i.amount) || 0), freq: expFreqOf(i, fallback), pct: (i && i.pct !== null && i.pct !== undefined && i.pct !== '' && isFinite(parseFloat(i.pct))) ? Math.min(100, Math.max(0, parseFloat(i.pct))) : null }))
             .filter(i => i.amount > 0).slice(0, 60);
     }
     // "Just me" but living with a spouse/others: each expense has a "Your %" (blank = 100%); only your share drives spending.
     function expShareMode() { const la = document.getElementById('livesAlone'); return !hhIsCouple() && !!la && la.value === 'no'; }
-    function expSpend(items) {
-        if (!expShareMode()) return expTotal(items);
-        let t = 0; (items || []).forEach(i => { const pc = (i && i.pct !== null && i.pct !== undefined && i.pct !== '' && isFinite(parseFloat(i.pct))) ? Math.min(100, Math.max(0, parseFloat(i.pct))) : 100; t += Math.max(0, parseFloat(i && i.amount) || 0) * pc / 100; });
-        return Math.round(t * 100) / 100;
+    function expSpend(items, unit) {
+        if (!expShareMode()) return expTotal(items, unit);
+        let t = 0; (items || []).forEach(i => { const pc = (i && i.pct !== null && i.pct !== undefined && i.pct !== '' && isFinite(parseFloat(i.pct))) ? Math.min(100, Math.max(0, parseFloat(i.pct))) : 100; t += Math.max(0, parseFloat(i && i.amount) || 0) * expMult(expFreqOf(i, unit)) * pc / 100; });
+        return Math.round(t / expMult(unit) * 100) / 100;
     }
+    function expDefFreq() { const e = document.getElementById('expAllFreq'); return e ? e.value : 'monthly'; }
+    function expSetAllFreq() { const f = expDefFreq(); expDraft.items.forEach(i => { i.freq = f; }); expRender(); }
     function expSetAll() {
         const v = parseFloat(document.getElementById('expAllPct').value);
         if (!isFinite(v) || v < 0 || v > 100) { document.getElementById('expShareMsg').textContent = 'Enter a percent from 0 to 100.'; return; }
@@ -5901,7 +5906,7 @@ The numbers in that example are placeholders from a prior year — replace every
     }
     function expMoney(n) { return '$' + n.toLocaleString('en-CA', { maximumFractionDigits: 2 }); }
     function expLoad(p) {   // called by populateForm
-        const items = expClean(p && p.expenseItems);
+        const items = expClean(p && p.expenseItems, p && p.expenseFreq);
         EXP = { on: !!(p && p.expenseOn) && items.length > 0, freq: (p && p.expenseFreq === 'weekly') ? 'weekly' : 'monthly', items: items };
         expDraft = null;
         expSync();
@@ -5910,12 +5915,12 @@ The numbers in that example are placeholders from a prior year — replace every
         const s = expState(); if (s.on && !s.items.length) s.on = false;
         const amt = document.getElementById('spendAmount'), fr = document.getElementById('spendFrequency');
         if (!amt || !fr) return;
-        if (s.on) { fr.value = s.freq; amt.value = expSpend(s.items); }
+        if (s.on) { fr.value = s.freq; amt.value = expSpend(s.items, s.freq); }
         amt.disabled = s.on; fr.disabled = s.on;
         const box = document.getElementById('expLockBox'), link = document.getElementById('expLinkRow');
         if (box) box.hidden = !s.on;
         if (link) link.style.display = s.on ? 'none' : '';
-        if (s.on) document.getElementById('expLockText').textContent = (expShareMode() ? 'Your share of the expenses adds up to ' : 'Your expenses add up to ') + expMoney(expSpend(s.items)) + (s.freq === 'weekly' ? ' a week.' : ' a month.');
+        if (s.on) document.getElementById('expLockText').textContent = (expShareMode() ? 'Your share of the expenses adds up to ' : 'Your expenses add up to ') + expMoney(expSpend(s.items, s.freq)) + ' a ' + freqWord(s.freq) + '.';
         if (typeof updateSpendFrequencyLabel === 'function') updateSpendFrequencyLabel();
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
@@ -5933,8 +5938,10 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<span class="exp-note">Enter regular recurring expenses only (groceries, utilities, insurance, subscriptions). Do not add one-time or specific-year costs here: add those in Life events instead.</span>'
             + '<button type="button" class="link-btn" onclick="expToEvents()">Go to Life events →</button>'
             + '<span class="exp-note">Enter today\'s money. These costs are raised for inflation each year as the plan moves forward.</span>'
-            + '<label for="expFreq">Are you entering monthly or weekly amounts?</label>'
-            + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select>'
+            + '<span class="exp-note">Each expense has its own frequency (some bills are weekly, monthly or yearly). Enter the amount as you are billed.</span>'
+            + '<label for="expAllFreq">Set all rows to</label><div class="exp-btns"><select id="expAllFreq"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select><button type="button" class="secondary" onclick="expSetAllFreq()">Set all rows</button></div>'
+            + '<label for="expFreq">Show the total per</label>'
+            + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select>'
             + '<div id="expHhBox" hidden><span class="exp-note">Who pays: in the last box of each row, enter the % of that expense you pay (the rest is your spouse\'s). Leave it blank to use the automatic split.</span>'
             + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
             + '<div id="expShareBox" hidden><span class="exp-note">You live with others, so enter the % of each expense that you pay in the last box of the row (blank means 100%). Only your share goes into the plan.</span>'
@@ -5951,8 +5958,8 @@ The numbers in that example are placeholders from a prior year — replace every
         return sh;
     }
     function openExpenses() {
-        if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount, pct: (i.pct === null || i.pct === undefined) ? '' : i.pct })) }; }
-        while (expDraft.items.length < 3) expDraft.items.push({ name: '', amount: '' });
+        if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount, freq: i.freq, pct: (i.pct === null || i.pct === undefined) ? '' : i.pct })) }; }
+        while (expDraft.items.length < 3) expDraft.items.push({ name: '', amount: '', freq: 'monthly' });
         const sh = buildExpSheet();
         document.getElementById('expFreq').value = expDraft.freq;
         document.getElementById('expErr').hidden = true;
@@ -5966,7 +5973,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function closeExp() { const sh = document.getElementById('expSheet'); if (sh) sh.classList.remove('open'); }
     function expCancel() { expDraft = null; closeExp(); }
     function expToEvents() { closeExp(); showStep(7); }   // the draft is kept, so reopening the list shows it again
-    function expFreqChange() { expDraft.freq = document.getElementById('expFreq').value === 'weekly' ? 'weekly' : 'monthly'; expUpdateTotal(); }
+    function expFreqChange() { const v = document.getElementById('expFreq').value; expDraft.freq = (v === 'weekly' || v === 'yearly') ? v : 'monthly'; expUpdateTotal(); }
     // Paste a list (one "name amount" per line, e.g. copied from a spreadsheet): adds a row per line with a positive amount.
     function expPasteRows() {
         const box = document.getElementById('expPaste'), msg = document.getElementById('expPasteMsg'); let added = 0, skipped = 0;
@@ -5975,13 +5982,13 @@ The numbers in that example are placeholders from a prior year — replace every
             const m = t.match(/^(.*?)[\s]+(\d[\d,]*(?:\.\d+)?)$/);
             const amt = m ? parseFloat(m[2].replace(/,/g, '')) : NaN, name = m ? m[1].trim() : '';
             if (!name || !(amt > 0)) { skipped++; return; }
-            expDraft.items.push({ name: name.charAt(0).toUpperCase() + name.slice(1), amount: String(amt) }); added++;
+            expDraft.items.push({ name: name.charAt(0).toUpperCase() + name.slice(1), amount: String(amt), freq: expDefFreq() }); added++;
         });
         expDraft.items = expDraft.items.filter(i => String(i.name).trim() || parseFloat(i.amount) > 0);
         box.value = ''; expRender(); expUpdateTotal();
         msg.textContent = added ? 'Added ' + added + ' expense' + (added === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' line' + (skipped === 1 ? '' : 's') + ' skipped: no name or a zero amount).' : '.') : 'Nothing added. Use one line per expense: the name, then the amount.';
     }
-    function expAddRow() { expDraft.items.push({ name: '', amount: '' }); expRender(); const r = document.querySelectorAll('#expList .en'); if (r.length) r[r.length - 1].focus(); }
+    function expAddRow() { expDraft.items.push({ name: '', amount: '', freq: expDefFreq() }); expRender(); const r = document.querySelectorAll('#expList .en'); if (r.length) r[r.length - 1].focus(); }
     function expRender() {
         const list = document.getElementById('expList'); list.innerHTML = '';
         expDraft.items.forEach((it, idx) => {
@@ -5990,26 +5997,29 @@ The numbers in that example are placeholders from a prior year — replace every
             n.oninput = () => { it.name = n.value; };
             const a = document.createElement('input'); a.type = 'number'; a.className = 'ea'; a.min = '0'; a.step = 'any'; a.inputMode = 'decimal'; a.value = it.amount; a.placeholder = 'Amount ($)';
             a.oninput = () => { it.amount = a.value; expUpdateTotal(); };
+            const fq = document.createElement('select'); fq.className = 'ef'; fq.setAttribute('aria-label', 'How often this is billed');
+            [['monthly', 'Monthly'], ['weekly', 'Weekly'], ['yearly', 'Yearly']].forEach(o => { const op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; fq.appendChild(op); });
+            fq.value = expFreqOf(it, 'monthly'); fq.onchange = () => { it.freq = fq.value; expUpdateTotal(); };
             const x = document.createElement('button'); x.type = 'button'; x.className = 'secondary'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove');
             x.onclick = () => { expDraft.items.splice(idx, 1); expRender(); };
-            row.appendChild(n); row.appendChild(a); const pcEl = hhExpPctInput(it); if (pcEl) row.appendChild(pcEl); row.appendChild(x); list.appendChild(row);
+            row.appendChild(n); row.appendChild(a); row.appendChild(fq); const pcEl = hhExpPctInput(it); if (pcEl) row.appendChild(pcEl); row.appendChild(x); list.appendChild(row);
         });
         expUpdateTotal();
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     function expUpdateTotal() {
-        const sm = expShareMode(), wk = expDraft.freq === 'weekly', all = expTotal(expDraft.items), mine = expSpend(expDraft.items);
+        const sm = expShareMode(), u = expDraft.freq, w = freqWord(u), all = expTotal(expDraft.items, u), mine = expSpend(expDraft.items, u);
         const showAll = sm && Math.abs(all - mine) > 0.004;
         document.getElementById('expAllRow').hidden = !showAll;
-        document.getElementById('expAllLbl').textContent = wk ? 'Household total per week' : 'Household total per month';
+        document.getElementById('expAllLbl').textContent = 'Household total per ' + w;
         document.getElementById('expAll').textContent = expMoney(all);
-        document.getElementById('expTotLbl').textContent = (showAll ? (wk ? 'Your share per week' : 'Your share per month') : (wk ? 'Total per week' : 'Total per month'));
+        document.getElementById('expTotLbl').textContent = (showAll ? 'Your share per ' : 'Total per ') + w;
         document.getElementById('expTotal').textContent = expMoney(mine);
         document.getElementById('expErr').hidden = true;
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     function expCommit() {
-        const items = expClean(expDraft.items);
+        const items = expClean(expDraft.items, expDraft.freq);
         if (!items.length) { document.getElementById('expErr').hidden = false; return; }
         EXP = { on: true, freq: expDraft.freq, items: items };
         expDraft = null; closeExp(); expSync();
