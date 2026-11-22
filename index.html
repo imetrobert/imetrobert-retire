@@ -553,6 +553,13 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             <label id="spendAmountLabel" for="spendAmount">Spending you want each month, after tax ($)</label>
             <input type="number" id="spendAmount" value="4000" step="100">
             <span class="note-text" id="spendFrequencyNote">Multiplied by 12 automatically for annual net spending targets. Withdrawing weekly instead of monthly also slightly changes how much growth your accounts earn during the year — see the note on Step 3.</span>
+            <div id="expLinkRow" class="exp-linkrow"><button type="button" class="link-btn" onclick="openExpenses()">Optional: calculate this from a list of your expenses →</button></div>
+            <div id="expLockBox" class="exp-lock" hidden>
+                <strong>Calculated from your expense list</strong>
+                <span id="expLockText" class="exp-lock-t"></span>
+                <span class="exp-lock-t">Edit the list to change it, or stop using the list to type a number yourself.</span>
+                <div class="exp-lock-b"><button type="button" class="link-btn" onclick="openExpenses()">Edit expense list</button><button type="button" class="link-btn" onclick="expStop()">Stop using the list</button></div>
+            </div>
 
             <div class="asset-row">
                 <h4>📈 Inflation — keep your purchasing power</h4>
@@ -2515,6 +2522,7 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('spendFrequency').value = p.spendFrequency ?? 'monthly';
         document.getElementById('spendAmount').value = p.spendAmount ?? 4000;
         updateSpendFrequencyLabel();
+        expLoad(p);
 
         document.getElementById('currentRrsp').value = p.currentRrsp ?? 250000;
         document.getElementById('contribRrsp').value = p.contribRrsp ?? 5000;
@@ -3031,7 +3039,8 @@ The numbers in that example are placeholders from a prior year — replace every
             targetAge: document.getElementById('alreadyRetired').checked ? (parseFloat(document.getElementById('currentAge').value) || 0) : (parseFloat(document.getElementById('targetAge').value) || 0),
             spouseAge: parseFloat(document.getElementById('spouseAge').value) || 0,
             spendFrequency: document.getElementById('spendFrequency').value,
-            spendAmount: parseFloat(document.getElementById('spendAmount').value) || 0,
+            spendAmount: expState().on ? expTotal(EXP.items) : (parseFloat(document.getElementById('spendAmount').value) || 0),
+            expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount })),
 
             currentRrsp: parseFloat(document.getElementById('currentRrsp').value) || 0,
             contribRrsp: parseFloat(document.getElementById('contribRrsp').value) || 0,
@@ -5421,6 +5430,118 @@ The numbers in that example are placeholders from a prior year — replace every
 
 
     // ---- Information pop-ups: long notes become a small "More info" button that opens a bottom sheet ----
+    // ---- Optional expense list: builds the spending target (spendAmount / spendFrequency) from a list ----
+    // EXP.on = the list drives the two fields (greyed out). Saved with the profile as expenseOn / expenseFreq / expenseItems.
+    var EXP = { on: false, freq: 'monthly', items: [] }, expDraft = null;
+    (function () {
+        const st = document.createElement('style');
+        st.textContent = '#spendAmount:disabled,#spendFrequency:disabled{opacity:.55;background:#eef1f5;color:#64748b;cursor:not-allowed}'
+            + '.exp-linkrow{margin:-0.3rem 0 0.9rem}.exp-lock{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:0.7rem 0.8rem;margin:-0.3rem 0 0.9rem;font-size:0.82rem;line-height:1.45;color:#334155}.exp-lock[hidden]{display:none}.exp-lock strong{display:block;color:#0f172a}.exp-lock-t{display:block}.exp-lock-b{display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.3rem}'
+            + '#expSheet{position:fixed;inset:0;z-index:9998;display:none}#expSheet.open{display:block}#expSheet .bd{position:absolute;inset:0;background:rgba(15,23,42,.5)}'
+            + '#expSheet .sh{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25)}'
+            + '#expSheet h3{margin:0 0 8px}#expSheet .exp-note{display:block;font-size:13px;line-height:1.45;color:#475569;margin:0 0 8px}'
+            + '#expSheet .exp-row{display:flex;gap:6px;align-items:center;margin:0 0 6px}#expSheet .exp-row input{margin:0;min-width:0;width:auto}#expSheet .exp-row .en{flex:1 1 auto}#expSheet .exp-row .ea{flex:0 0 104px}'
+            + '#expSheet .exp-row button{flex:0 0 40px;min-height:40px;padding:0}#expSheet .exp-tot{display:flex;justify-content:space-between;align-items:center;margin:10px 0;padding:10px 12px;border-radius:12px;background:#eff6ff;font-weight:700;color:#1e3a8a}'
+            + '#expSheet .exp-err{color:#b91c1c;font-size:13px;margin:6px 0}#expSheet .exp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}';
+        document.head.appendChild(st);
+    })();
+    function expState() { if (!EXP || !Array.isArray(EXP.items)) EXP = { on: false, freq: 'monthly', items: [] }; return EXP; }
+    function expTotal(items) { let t = 0; (items || []).forEach(i => { t += Math.max(0, parseFloat(i && i.amount) || 0); }); return Math.round(t * 100) / 100; }
+    function expClean(items) {
+        return (Array.isArray(items) ? items : []).map(i => ({ name: String((i && i.name) || '').slice(0, 60), amount: Math.max(0, parseFloat(i && i.amount) || 0) }))
+            .filter(i => i.amount > 0).slice(0, 60);
+    }
+    function expMoney(n) { return '$' + n.toLocaleString('en-CA', { maximumFractionDigits: 2 }); }
+    function expLoad(p) {   // called by populateForm
+        const items = expClean(p && p.expenseItems);
+        EXP = { on: !!(p && p.expenseOn) && items.length > 0, freq: (p && p.expenseFreq === 'weekly') ? 'weekly' : 'monthly', items: items };
+        expDraft = null;
+        expSync();
+    }
+    function expSync() {
+        const s = expState(); if (s.on && !s.items.length) s.on = false;
+        const amt = document.getElementById('spendAmount'), fr = document.getElementById('spendFrequency');
+        if (!amt || !fr) return;
+        if (s.on) { fr.value = s.freq; amt.value = expTotal(s.items); }
+        amt.disabled = s.on; fr.disabled = s.on;
+        const box = document.getElementById('expLockBox'), link = document.getElementById('expLinkRow');
+        if (box) box.hidden = !s.on;
+        if (link) link.style.display = s.on ? 'none' : '';
+        if (s.on) document.getElementById('expLockText').textContent = 'Your expenses add up to ' + expMoney(expTotal(s.items)) + (s.freq === 'weekly' ? ' a week.' : ' a month.');
+        if (typeof updateSpendFrequencyLabel === 'function') updateSpendFrequencyLabel();
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function expStop() {
+        const s = expState(); s.on = false; expDraft = null; closeExp(); expSync();
+        const amt = document.getElementById('spendAmount');
+        amt.dispatchEvent(new Event('input', { bubbles: true })); amt.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function buildExpSheet() {
+        let sh = document.getElementById('expSheet'); if (sh) return sh;
+        sh = document.createElement('div'); sh.id = 'expSheet';
+        sh.innerHTML = '<div class="bd" onclick="closeExp()"></div><div class="sh" role="dialog" aria-modal="true">'
+            + '<h3>Your expenses</h3>'
+            + '<span class="exp-note">Enter regular recurring expenses only (groceries, utilities, insurance, subscriptions). Do not add one-time or specific-year costs here: add those in Life events instead.</span>'
+            + '<button type="button" class="link-btn" onclick="expToEvents()">Go to Life events →</button>'
+            + '<span class="exp-note">Enter today\'s money. These costs are raised for inflation each year as the plan moves forward.</span>'
+            + '<label for="expFreq">Are you entering monthly or weekly amounts?</label>'
+            + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select>'
+            + '<div id="expList"></div>'
+            + '<button type="button" class="secondary" onclick="expAddRow()">+ Add an expense</button>'
+            + '<div class="exp-tot"><span id="expTotLbl">Total per month</span><b id="expTotal">$0</b></div>'
+            + '<div class="exp-err" id="expErr" hidden>Add at least one expense with an amount, or tap Cancel.</div>'
+            + '<div class="exp-btns"><button type="button" onclick="expCommit()">Use this list</button><button type="button" class="secondary" onclick="expCancel()">Cancel</button>'
+            + '<button type="button" class="link-btn" id="expStopBtn" onclick="expStop()">Stop using the list</button></div></div>';
+        document.body.appendChild(sh);
+        return sh;
+    }
+    function openExpenses() {
+        if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount })) }; }
+        while (expDraft.items.length < 3) expDraft.items.push({ name: '', amount: '' });
+        const sh = buildExpSheet();
+        document.getElementById('expFreq').value = expDraft.freq;
+        document.getElementById('expErr').hidden = true;
+        document.getElementById('expStopBtn').style.display = expState().on ? '' : 'none';
+        expRender();
+        sh.classList.add('open');
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function closeExp() { const sh = document.getElementById('expSheet'); if (sh) sh.classList.remove('open'); }
+    function expCancel() { expDraft = null; closeExp(); }
+    function expToEvents() { closeExp(); showStep(7); }   // the draft is kept, so reopening the list shows it again
+    function expFreqChange() { expDraft.freq = document.getElementById('expFreq').value === 'weekly' ? 'weekly' : 'monthly'; expUpdateTotal(); }
+    function expAddRow() { expDraft.items.push({ name: '', amount: '' }); expRender(); const r = document.querySelectorAll('#expList .en'); if (r.length) r[r.length - 1].focus(); }
+    function expRender() {
+        const list = document.getElementById('expList'); list.innerHTML = '';
+        expDraft.items.forEach((it, idx) => {
+            const row = document.createElement('div'); row.className = 'exp-row';
+            const n = document.createElement('input'); n.type = 'text'; n.className = 'en'; n.maxLength = 60; n.value = it.name; n.placeholder = 'Expense (e.g. Groceries)';
+            n.oninput = () => { it.name = n.value; };
+            const a = document.createElement('input'); a.type = 'number'; a.className = 'ea'; a.min = '0'; a.step = 'any'; a.inputMode = 'decimal'; a.value = it.amount; a.placeholder = 'Amount ($)';
+            a.oninput = () => { it.amount = a.value; expUpdateTotal(); };
+            const x = document.createElement('button'); x.type = 'button'; x.className = 'secondary'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove');
+            x.onclick = () => { expDraft.items.splice(idx, 1); expRender(); };
+            row.appendChild(n); row.appendChild(a); row.appendChild(x); list.appendChild(row);
+        });
+        expUpdateTotal();
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function expUpdateTotal() {
+        document.getElementById('expTotLbl').textContent = expDraft.freq === 'weekly' ? 'Total per week' : 'Total per month';
+        document.getElementById('expTotal').textContent = expMoney(expTotal(expDraft.items));
+        document.getElementById('expErr').hidden = true;
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function expCommit() {
+        const items = expClean(expDraft.items);
+        if (!items.length) { document.getElementById('expErr').hidden = false; return; }
+        EXP = { on: true, freq: expDraft.freq, items: items };
+        expDraft = null; closeExp(); expSync();
+        const amt = document.getElementById('spendAmount');
+        amt.dispatchEvent(new Event('input', { bubbles: true })); amt.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof refreshCollapsibleSummaries === 'function') refreshCollapsibleSummaries();
+    }
+
     function showInfo(title, html) {
         let sh = document.getElementById('infoSheet');
         if (!sh) {
@@ -5433,7 +5554,7 @@ The numbers in that example are placeholders from a prior year — replace every
         sh.classList.add('open');
     }
     function closeInfo() { const sh = document.getElementById('infoSheet'); if (sh) sh.classList.remove('open'); }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeInfo(); closeExp(); } });
     function initInfoNotes() {
         document.querySelectorAll('.note-text').forEach(n => {
             if (n.id || n.dataset.info || n.closest('#infoSheet')) return;
