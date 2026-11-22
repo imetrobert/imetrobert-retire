@@ -3795,10 +3795,15 @@ The numbers in that example are placeholders from a prior year — replace every
             const idxY = idxAtAge(currentAgeSim);                 // price level vs today
             const infY = infRateAtAge(currentAgeSim);             // this year's inflation
             const taxRules = scaleTaxRules(taxRulesBase, idxY);   // brackets/credits indexed to this year
-            const annualNetNeedY = annualNetNeed * idxY;          // spending target in this year's dollars
+            const annualNetNeedY = ((p.hhSurv && yr >= p.hhSurv.yr) ? p.hhSurv.need : annualNetNeed) * idxY;          // spending target in this year's dollars
             let spouseAgeSim = p.calcMode === 'couple' ? (p.spouseAge + (currentAgeSim - p.currentAge)) : null;
             let rlifTransferThisYear = 0;
             let ul = { bB: 0, oB: 0, fB: 0, fO: 0, elig: 1 };
+            if (p.hhSurv && yr === p.hhSurv.yr) {   // household mode: the first spouse has died; their savings roll over to this person tax-free
+                const sv = p.hhSurv, f = idxY / (sv.idx || 1);
+                simRrsp += sv.rrsp * f; simRlifUnlocked += sv.rlif * f; simLira += sv.lira * f; simBell += sv.pool * f;
+                simNonReg += sv.non * f; nonRegACB += sv.acb * f; simFtq += sv.ftq * f; simTfsa += sv.tfsa * f;
+            }
             const opn = { rrsp: simRrsp, rlif: simRlifUnlocked, lira: simLira, bell: simBell, non: simNonReg, ftq: simFtq, tfsa: simTfsa };
             const tfsaLimitY = tfsaLimitAtAge(currentAgeSim);
             tfsaRoom += tfsaLimitY + lastTfsaDraw;
@@ -4329,7 +4334,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const estClawBase = estClaw(estBase), estClawDeath = estClaw(estBase + estDeemed);
         const estTaxBase = calculateTax(Math.max(0, estBase - estClawBase), estAge, 0, taxRulesEnd, { alone: estAlone }).totalTax;
         const estTaxDeath = calculateTax(Math.max(0, estBase + estDeemed - estClawDeath), estAge, 0, taxRulesEnd, { alone: estAlone }).totalTax;
-        const estTax = Math.max(0, (estTaxDeath - estTaxBase) + (estClawDeath - estClawBase));
+        const estTax = p.hhRollover ? 0 : Math.max(0, (estTaxDeath - estTaxBase) + (estClawDeath - estClawBase));
         const estate = {
             age: estAge,
             registeredBalances: estRegistered,
@@ -4345,7 +4350,7 @@ The numbers in that example are placeholders from a prior year — replace every
             afterTaxEstate: endPortfolio - estTax
         };
 
-        return { taxAtDeath: estate, totalTaxesPaidToday, depletionAge, totalTaxesPaid, totalClawback, totalWithholdingTax, finalPortfolio: endPortfolio, scheduleRows, rlifTransferDone, rlifTransferAge, rlifTransferAmount, eventLog };
+        return { taxAtDeath: estate, totalTaxesPaidToday, depletionAge, totalTaxesPaid, totalClawback, totalWithholdingTax, finalPortfolio: endPortfolio, endState: { rrsp: simRrsp, rlif: simRlifUnlocked, lira: simLira, pool: simBell, non: simNonReg, acb: nonRegACB, ftq: simFtq, tfsa: simTfsa, idx: idxEnd, age: estAge }, scheduleRows, rlifTransferDone, rlifTransferAge, rlifTransferAmount, eventLog };
     }
 
     function runMonteCarlo(p, qppAge, oasAge, taxRules, trials) {
@@ -5486,7 +5491,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function hhLabel(k) { const n = String((HH.names && HH.names[k]) || '').trim(); return n || (k === 'me' ? 'You' : 'Your spouse'); }
     function hhClone(v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); }
     function hhPick(src) { const o = {}; HH_KEYS.forEach(k => { if (src && k in src) o[k] = hhClone(src[k]); }); return o; }
-    function hhStrip(p) { const o = hhClone(p) || {}; ['id', 'timestamp', 'timestampMs', 'name', 'hhSpouse', 'hhSplit', 'hhNames', 'hhPis'].forEach(k => delete o[k]); return o; }
+    function hhStrip(p) { const o = hhClone(p) || {}; ['id', 'timestamp', 'timestampMs', 'name', 'hhSpouse', 'hhSplit', 'hhNames', 'hhPis', 'hhRoll', 'hhSurvPct'].forEach(k => delete o[k]); return o; }
     function hhBlank(me) {
         const s = hhClone(me) || {}; delete s.hhSpouse; delete s.id; s.name = '';
         ['currentRrsp', 'contribRrsp', 'currentTfsa', 'contribTfsa', 'liraBalance', 'contribLira', 'fedDcBalance', 'contribFedDc', 'ftqBalance', 'contribFtq', 'currentNonReg', 'contribNonReg', 'ownPensionAnnual', 'extraRegAmt', 'tfsaRoomNow']
@@ -5513,11 +5518,11 @@ The numbers in that example are placeholders from a prior year — replace every
         let me;
         if (HH.who === 'spouse') { HH.spouse = raw; me = Object.assign({}, HH.me); }
         else { HH.me = raw; me = raw; }
-        me.hhSpouse = hhStrip(HH.spouse); me.hhSplit = HH.split; me.hhPis = HH.pis; me.hhNames = { me: HH.names.me, sp: HH.names.sp };
+        me.hhSpouse = hhStrip(HH.spouse); me.hhSplit = HH.split; me.hhPis = HH.pis; me.hhRoll = HH.roll; me.hhSurvPct = HH.survPct; me.hhNames = { me: HH.names.me, sp: HH.names.sp };
         return me;
     }
     function populateForm(p) {
-        HH.who = 'me'; HH.me = p; HH.split = (p && p.hhSplit) || ''; HH.pis = (p && p.hhPis === 'off') ? 'off' : 'on'; HH.pisInfo = null; HH.view = 'house'; HH.plans = null; HH.legacy = '';
+        HH.who = 'me'; HH.me = p; HH.split = (p && p.hhSplit) || ''; HH.pis = (p && p.hhPis === 'off') ? 'off' : 'on'; HH.pisInfo = null; HH.roll = (p && p.hhRoll === 'off') ? 'off' : 'on'; HH.survPct = (p && p.hhSurvPct) || 75; HH.rollInfo = null; HH.view = 'house'; HH.plans = null; HH.legacy = '';
         HH.names = { me: String((p && p.hhNames && p.hhNames.me) || ''), sp: String((p && p.hhNames && p.hhNames.sp) || '') };
         if (p && p.calcMode === 'couple') {
             if (p.hhSpouse) { HH.spouse = Object.assign(hhBlank(p), p.hhSpouse, { calcMode: 'couple' }); HH.visited = true; }
@@ -5620,6 +5625,8 @@ The numbers in that example are placeholders from a prior year — replace every
         HH.plans = { me: hhPlanFor(HH.prof.me, rules), sp: hhPlanFor(HH.prof.sp, rules) };
         HH.pisInfo = null;
         if (HH.pis !== 'off') { try { hhSplitPensions(rules); } catch (e) { HH.pisInfo = null; } }
+        HH.rollInfo = null;
+        if (HH.roll !== 'off') { try { hhRollover(rules); } catch (e) { HH.rollInfo = null; } }
         saveProfileProgress();
         document.getElementById('hhTabs').hidden = false;
         hhUi();
@@ -5671,6 +5678,39 @@ The numbers in that example are placeholders from a prior year — replace every
         if (on && inf) h += inf.saved > 0
             ? '<div class="hh-cards"><div class="hh-card"><small>Tax and clawback saved by splitting pension income</small><b>' + fmt(inf.saved) + '</b><span>estimate over the plan</span></div></div>'
             : '<div class="hh-status">Splitting pension income would not lower your tax in this plan.</div>';
+        return h;
+    }
+    // ---- Spousal rollover (household mode) ----
+    // The plan that ends first is the first death. Its registered accounts, TFSA and non-registered account pass to the
+    // survivor tax-free (no tax at that death); the survivor then covers survPct% of the household spending.
+    function hhRerun(pl, rules, extra) {
+        const pr = Object.assign({}, pl.p, extra);
+        return { p: pr, q: pl.q, o: pl.o, run: withRepeatableRandom(pr.returnModel === 'montecarlo', () => runSimulation(pr, pl.q, pl.o, rules, true)) };
+    }
+    function hhRollover(rules) {
+        const A = HH.plans.me, B = HH.plans.sp, nA = A.run.scheduleRows.length, nB = B.run.scheduleRows.length;
+        if (nA === nB || !nA || !nB) return;
+        const dead = nA < nB ? 'me' : 'sp', live = dead === 'me' ? 'sp' : 'me', d = Math.min(nA, nB);
+        const D = hhRerun(HH.plans[dead], rules, { hhRollover: true }), e = D.run.endState;
+        const pct = Math.min(100, Math.max(40, parseFloat(HH.survPct) || 75));
+        const sv = { yr: d, need: getAnnualNetNeed(HH.me) * pct / 100, idx: e.idx, rrsp: e.rrsp, rlif: e.rlif, lira: e.lira, pool: e.pool, non: e.non, acb: e.acb, ftq: e.ftq, tfsa: e.tfsa };
+        const S = hhRerun(HH.plans[live], rules, { hhSurv: sv });
+        HH.plans[dead] = D; HH.plans[live] = S; HH.prof.me = HH.plans.me.p; HH.prof.sp = HH.plans.sp.p;
+        HH.rollInfo = { dead: dead, age: e.age, year: new Date().getFullYear() + d - 1, amount: (e.rrsp + e.rlif + e.lira + e.non + e.ftq + e.tfsa) / (e.idx || 1), pct: pct };
+    }
+    function hhSetRoll() {
+        HH.roll = document.getElementById('hhRollChk').checked ? 'on' : 'off';
+        const v = parseFloat(document.getElementById('hhSurvIn').value);
+        HH.survPct = isNaN(v) ? 75 : Math.min(100, Math.max(40, Math.round(v)));
+        hhCalculate('house');
+    }
+    function hhRollBlock(fmt) {
+        const on = HH.roll !== 'off', inf = HH.rollInfo;
+        let h = '<div class="hh-split"><label class="hh-pis"><input type="checkbox" id="hhRollChk"' + (on ? ' checked' : '') + ' onchange="hhSetRoll()"> Model spousal rollover when the first spouse dies</label>'
+            + '<label for="hhSurvIn">Survivor spending (% of household)</label><input type="number" id="hhSurvIn" min="40" max="100" value="' + (HH.survPct || 75) + '" onchange="hhSetRoll()"></div>';
+        if (on && inf) h += '<div class="hh-status">When the first spouse dies, their savings pass to the survivor tax-free and the survivor then covers the share of household spending set above.</div>'
+            + '<div class="hh-cards"><div class="hh-card"><small>First death</small><b>' + Math.round(inf.age) + '</b><span>' + hhEsc(hhLabel(inf.dead)) + ', ' + inf.year + '</span></div>'
+            + '<div class="hh-card"><small>Passes to the survivor, tax-free</small><b>' + fmt(inf.amount) + '</b><span>in today\'s dollars</span></div></div>';
         return h;
     }
     function hhSiblings(hide) {
@@ -5726,7 +5766,7 @@ The numbers in that example are placeholders from a prior year — replace every
             return row ? '<div class="hh-status">⚠ ' + label + ': cannot fully fund spending from age ' + row.age + '</div>' : '<div class="hh-status">✓ ' + label + ': fully funded to age ' + p.lifeExpectancy + '</div>';
         };
         const lastA = rA[rA.length - 1] || {}, lastB = rB[rB.length - 1] || {};
-        const endTot = A.run.finalPortfolio / (real ? (lastA.inflationIndex || 1) : 1) + B.run.finalPortfolio / (real ? (lastB.inflationIndex || 1) : 1);
+        const endTot = (A.p.hhRollover ? 0 : A.run.finalPortfolio) / (real ? (lastA.inflationIndex || 1) : 1) + (B.p.hhRollover ? 0 : B.run.finalPortfolio) / (real ? (lastB.inflationIndex || 1) : 1);
         const byExp = HH.expShare != null;
         document.getElementById('hhPanel').innerHTML =
             '<h3 class="section-title">Household plan</h3>'
@@ -5738,12 +5778,12 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<span class="note-text">' + (byExp ? 'The split comes from who pays each expense in your expense list.' : 'Automatic: in proportion to each person\'s expected retirement income (government benefits, pensions and 4% of savings). If one of you runs short while the other has money left over, change the split.') + '</span></div>'
             + stat(A, nm, 'me') + stat(B, ns, 'sp')
             + '<div class="hh-status">' + nm + ': QPP at age ' + A.q + ', OAS at age ' + A.o + '</div><div class="hh-status">' + ns + ': QPP at age ' + B.q + ', OAS at age ' + B.o + '</div>'
-            + hhPisBlock(fmt)
+            + hhPisBlock(fmt) + hhRollBlock(fmt)
             + '<div class="hh-cards"><div class="hh-card"><small>Tax and OAS clawback over the plan</small><b>' + fmt(taxTot) + '</b><span>both of you</span></div>'
             + '<div class="hh-card"><small>Savings left at the end</small><b>' + fmt(endTot) + '</b><span>both of you</span></div></div>'
             + '<h3 class="section-title">Year by year, household view</h3>'
             + '<div class="hh-tablewrap"><table class="hh-table"><thead><tr><th>Year</th><th>Ages</th><th>Spending need</th><th>Take-home</th><th>Tax</th><th>Pension split</th><th><span>' + nm + '</span><br><small>takes out</small></th><th><span>' + ns + '</span><br><small>takes out</small></th><th>Savings left</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Spousal rollover is not modeled. Each life event is split by the % entered on it (blank means the person who entered it pays all). Tap the You or Your spouse tab above for a full plan for one person.</span>';
+            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Survivor pensions and benefits are not modeled. Each life event is split by the % entered on it (blank means the person who entered it pays all). Tap the You or Your spouse tab above for a full plan for one person.</span>';
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
     }
     // Recommend the split of household spending that gives the best combined result (same scoring the optimizer uses).
