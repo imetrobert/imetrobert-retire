@@ -117,3 +117,9 @@ Step 1 asks "Are you filling this out for you, or for you and a spouse?". Choosi
 ## Menu and saved copies (wording)
 - Planner menu rows are in `#toolMenu` in `index.html` (Life events, Expenses, Saved on this device, ...); the account rows (My plans (cloud), Documentation, Sign out) are added by `account.js` (`refreshMenu`). There is no floating account button any more: My plans opens from the menu only.
 - "Saved on this device" = scenarios in this browser's localStorage (`showProfileManager`); "My plans (cloud)" = encrypted copies in the user's account. Keep these two names distinct everywhere.
+
+## Plain-language helpers (results summary, account help, example tags, return presets)
+- Results top: `planSummaryHtml()` (the "Your plan in a few lines" box, called from `renderResultsUi`), the hero `todayNote` (today's-dollars line) and the "growth" label on year cards. Folds are named "What if? Test your plan" and "Technical details and assumptions".
+- Step 2 cards: `ACCT_HELP` (one sentence under each account name, matched on the card title) and `cardSummary()` (collapsed line: balance, "· not adding", "· example" until the person edits the field; `markAllTouched()` runs after a plan is loaded).
+- Step 3 return presets: `applyReturnPreset(pre, post)` and the three buttons in `#retPresets` (Cautious 4/3, Balanced 6/4.5, Optimistic 7.5/5.5); `updateReturnPresets()` highlights the matching one.
+- English only: no French entries needed.
