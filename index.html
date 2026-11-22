@@ -3308,6 +3308,8 @@ The numbers in that example are placeholders from a prior year — replace every
             const p = allProfiles[k];
             const isJust = justSavedId === k, isLatest = isJust || (k === latestId && Date.now() - latestMs < 24 * 3600 * 1000);
             const sync = !syncMap[k] ? 'none' : (syncMap[k] === planSig(p) ? 'same' : 'diff');
+            const btn = 'padding:6px 12px; font-size:12px;';
+            const syncBtn = sync === 'same' ? '' : `<button type="button" style="${btn}" data-act="sync" data-id="${escHtml(k)}">Sync to cloud</button>`;
             const syncHtml = sync === 'same' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#dcfce7; color:#166534; font-size:12px; font-weight:600;">☁ Same on this device and in the cloud</span>'
                 : sync === 'diff' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#ffedd5; color:#9a3412; font-size:12px; font-weight:600;">⚠ Newer on this device than in the cloud</span>'
                 : '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:12px; font-weight:600;">Device only, not in the cloud yet</span>';
@@ -3316,7 +3318,6 @@ The numbers in that example are placeholders from a prior year — replace every
             const title = p.name ? escHtml(p.name) : ('Unnamed scenario ' + (keys.length - i));
             const isRenaming = renamingId === k;
             const isDeleting = pendingDeleteId === k;
-            const btn = 'padding:6px 12px; font-size:12px;';
             html += `
                 <div id="pm-${escHtml(k)}" style="background:${isLatest ? '#f0fdf4' : '#fff'}; padding:10px; border-radius:6px; margin-bottom:8px; border:${isLatest ? '2px solid #16a34a' : '1px solid #cbd5e1'};">
                     <div style="margin-bottom:6px;">
@@ -3335,6 +3336,7 @@ The numbers in that example are placeholders from a prior year — replace every
                             <button type="button" class="secondary" style="${btn}" data-act="cancelDelete" data-id="${escHtml(k)}">Keep it</button>
                         ` : `
                             <button type="button" style="${btn}" data-act="load" data-id="${escHtml(k)}">Load</button>
+                            ${syncBtn}
                             <button type="button" class="secondary" style="${btn}" data-act="rename" data-id="${escHtml(k)}">Rename</button>
                             <button type="button" class="warn-btn" style="${btn}" data-act="delete" data-id="${escHtml(k)}">Delete</button>
                         `}
@@ -3363,6 +3365,16 @@ The numbers in that example are placeholders from a prior year — replace every
         else if (act === 'rename') { renamingId = id; pendingDeleteId = null; renderProfileManager(); }
         else if (act === 'cancelRename') { renamingId = null; renderProfileManager(); }
         else if (act === 'saveName') renameSpecificProfile(id);
+        else if (act === 'sync') {
+            const prof = getAllProfiles()[id];
+            if (!prof || !window.awrSyncPlan) return;
+            b.disabled = true;
+            window.awrSyncPlan(prof).then(function (r) {
+                if (r === 'ok') { showSaveBadge('Synced to the cloud'); }
+                else if (r === 'fail') { showSaveBadge('Could not sync. Check your connection and try again'); }
+                renderProfileManager();
+            });
+        }
         else if (act === 'delete') { pendingDeleteId = id; renamingId = null; renderProfileManager(); }
         else if (act === 'cancelDelete') { pendingDeleteId = null; renderProfileManager(); }
         else if (act === 'confirmDelete') deleteSpecificProfile(id);

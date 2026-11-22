@@ -212,8 +212,8 @@
     V.planId = p.id;
     return p;
   }
-  function savePlan() {
-    var p = currentPlan(), existing = (V.rows || []).filter(function (r) { return r.p && r.p.id === p.id; })[0];
+  function savePlan(given) {
+    var p = given || currentPlan(), existing = (V.rows || []).filter(function (r) { return r.p && r.p.id === p.id; })[0];
     var salt = V.salt || crypto.getRandomValues(new Uint8Array(16));
     var payload = { format: 'awr-account', version: 1, app: CFG.app, savedAt: new Date().toISOString(), profile: p };
     return encrypt(payload, V.pass, salt).then(function (blob) {
@@ -224,6 +224,13 @@
       });
     }).then(function (r) { if (!r.ok) throw new Error('server'); try { if (window.planCloudMark) window.planCloudMark(p); } catch (e) {} });
   }
+  // Used by the device list: push one saved device scenario to the cloud. Needs the passphrase unlocked first.
+  window.awrSyncPlan = function (profile) {
+    if (!V.pass) { openPanel(); return Promise.resolve('locked'); }
+    return savePlan(profile).then(function () { return listRows(); }).then(function (raw) { V.rawRows = raw; return unlockWith(V.pass, raw); })
+      .then(function (rows) { V.rows = rows; V.haveRows = rows.length > 0; if (rows.length && !V.salt) V.salt = unb64(JSON.parse(rows[0].blob).salt); return 'ok'; })
+      .catch(function () { return 'fail'; });
+  };
   function deleteRow(rowId) {
     return token().then(function (tk) { return call('DELETE', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(rowId), null, tk); })
       .then(function (r) { if (!r.ok) throw new Error('server'); });
