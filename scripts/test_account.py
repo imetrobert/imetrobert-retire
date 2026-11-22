@@ -73,6 +73,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda e: errors.append(str(e)))
     ctx.route(SB + '/**', handler)
     page.goto(URL); page.wait_for_selector('#awr-gate')
+    check(page.query_selector('#awr-gate .awr-req') is None, 'private app: no request-access line on the sign-in screen')
     check(page.is_hidden('#currentAge'), 'planner hidden before sign-in')
     check(page.locator('#awr-pill').count() == 0, 'no account button before sign-in')
     page.fill('#awr-email', 'tester@example.com'); page.fill('#awr-pw', 'wrong'); page.click('#awr-gate button[type=submit]')
