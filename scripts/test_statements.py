@@ -89,6 +89,11 @@ with sync_playwright() as pw:
     page.wait_for_function("!document.getElementById('stmtOut').textContent.includes('Reading') && document.getElementById('stmtOut').textContent.length > 20")
     check('not a PDF' in out_text(), 'Image file: asks for the PDF')
 
+
+    # 9. public-sector statements are not applied here (no DB-pension card)
+    fresh(); upload('fake-public-sector-en.pdf'); page.wait_for_selector('#stmtPickFold')
+    check(not page.query_selector('#stmtApplyPub'), 'Public-sector statement: no Apply button in this planner')
+
     # 8. privacy + health
     outside = [u for u in requests if not u.startswith(ORIGIN) and not u.startswith('data:') and not u.startswith('blob:')
                and 'fonts.googleapis.com' not in u and 'fonts.gstatic.com' not in u]

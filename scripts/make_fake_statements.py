@@ -59,7 +59,30 @@ def other(name):   # a PDF of a different document: dollar amounts but no sectio
     c.setFont('Helvetica', 11); c.drawString(72, 700, 'Some other letter'); c.drawString(72, 680, 'Monthly benefit now: 612 $'); c.drawString(72, 660, 'Annual total: 7 344 $')
     c.showPage(); c.save()
 
+def public_sector(name, dollar_first=True):
+    c = canvas.Canvas(os.path.join(OUT, name), pagesize=letter)
+    W, H = letter
+    c.setFont('Helvetica-Bold', 16); c.drawString(60, H - 60, 'Statement of Participation')
+    c.setFont('Helvetica', 9); c.drawString(60, H - 76, 'FAKE EXAMPLE - NOT A REAL PERSON - public-sector pension plan')
+    c.setFont('Helvetica-Bold', 11); c.drawString(60, H - 130, 'Personalized retirement scenarios')
+    c.setFont('Helvetica', 8)
+    c.drawString(300, H - 160, 'Annual pension payable until age 65'); c.drawString(450, H - 160, 'Annual pension payable as of age 65')
+    rows = [('At the earliest possible retirement date', 'Age 55', 20.1, '$9,800', '$11,200'),
+            ('At the earliest date on which you are eligible for an unreduced pension', 'Age 61', 26.2, '$17,400', '$18,900'),
+            ('At age 65', 'Age 65', 30.2, '$21,300', '$21,300')]
+    for i, (lab, age, yrs, a, b) in enumerate(rows):
+        y = H - 200 - i * 60
+        c.setFont('Helvetica-Bold', 9)
+        import textwrap
+        for li, part in enumerate(textwrap.wrap(lab, 62)):
+            c.drawString(60, y - li * 10, part)
+        c.setFont('Helvetica', 9); c.drawString(60, y - 24, age + ' - %.1f years of service' % yrs)
+        c.drawString(330, y - 6, a if dollar_first else a[1:] + ' $'); c.drawString(480, y - 6, b if dollar_first else b[1:] + ' $')
+    c.setFont('Helvetica', 9); c.drawString(60, H - 420, 'Employment in 2025: eligible salary $121,748.42 and contributions $9,824.13')
+    c.showPage(); c.save()
+
 build('fake-qpp-en.pdf', 'en')
+public_sector('fake-public-sector-en.pdf')
 build('fake-qpp-fr.pdf', 'fr')
 build('fake-qpp-split-dollar.pdf', 'en', split_dollar=True)
 blank('fake-no-text.pdf')
