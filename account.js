@@ -45,7 +45,7 @@
       myPlans: 'My plans (cloud)', menuCloud: 'Save / load scenarios in the cloud', close: 'Close', signedInAs: 'Signed in as',
       saveH: 'Save this plan to my account', saveHelp: 'Your plan is encrypted on this device before it is saved to your account, so you can open it on any device. (Save / load scenarios on this device keeps copies in this browser only.) Only your passphrase can open it, and it cannot be recovered if forgotten.',
       first: 'First time: choose a passphrase of at least 10 characters (a few words works well). You will need it on every device.',
-      pass: 'Passphrase', pass2: 'Repeat the passphrase', unlock: 'Unlock my plans', saveBtn: 'Save this plan', lock: 'Lock',
+      pass: 'Passphrase', pass2: 'Repeat the passphrase', unlock: 'Unlock my plans', saveBtn: 'Save this plan', lock: 'Lock', remember: 'Remember the passphrase on this device',
       devSame: '✓ Same on this device and in the cloud', devDiff: '⚠ Different from this device\'s copy', devNone: 'Not saved on this device',
       listH: 'My saved plans', none: 'No plans saved yet.', open: 'Open in the form', del: 'Delete', unnamed: 'Unnamed plan', savedOn: 'Saved',
       tooShort: 'The passphrase must be at least 10 characters.', mismatch: 'The two passphrases do not match.',
@@ -67,7 +67,7 @@
       myPlans: 'Mes plans (nuage)', close: 'Fermer', signedInAs: 'Connecté en tant que',
       saveH: 'Enregistrer ce plan dans mon compte', saveHelp: 'Votre plan est chiffré sur cet appareil avant d’être enregistré dans votre compte, et vous pouvez l’ouvrir sur tout appareil. (L’élément de menu Enregistrés sur cet appareil conserve des copies dans ce navigateur seulement.) Seule votre phrase secrète peut l’ouvrir, et elle ne peut pas être récupérée si elle est oubliée.',
       first: 'Première fois : choisissez une phrase secrète d’au moins 10 caractères (quelques mots suffisent). Vous en aurez besoin sur chaque appareil.',
-      pass: 'Phrase secrète', pass2: 'Répétez la phrase secrète', unlock: 'Déverrouiller mes plans', saveBtn: 'Enregistrer ce plan', lock: 'Verrouiller',
+      pass: 'Phrase secrète', pass2: 'Répétez la phrase secrète', unlock: 'Déverrouiller mes plans', saveBtn: 'Enregistrer ce plan', lock: 'Verrouiller', remember: 'Retenir la phrase secrète sur cet appareil',
       devSame: '✓ Identique sur cet appareil et dans le nuage', devDiff: '⚠ Différent de la copie de cet appareil', devNone: 'Pas enregistré sur cet appareil',
       listH: 'Mes plans enregistrés', none: 'Aucun plan enregistré pour le moment.', open: 'Ouvrir dans le formulaire', del: 'Supprimer', unnamed: 'Plan sans nom', savedOn: 'Enregistré',
       tooShort: 'La phrase secrète doit contenir au moins 10 caractères.', mismatch: 'Les deux phrases secrètes ne correspondent pas.',
@@ -117,6 +117,21 @@
   function load() { try { return JSON.parse(localStorage.getItem(CFG.storageKey) || 'null'); } catch (e) { return null; } }
   function save(v) { try { localStorage.setItem(CFG.storageKey, JSON.stringify(v)); } catch (e) {} }
   function clear() { try { localStorage.removeItem(CFG.storageKey); } catch (e) {} }
+  // Optional: remember the passphrase on THIS device only (a checkbox on the unlock screen, off by default).
+  // Lock and Sign out erase it; a wrong remembered passphrase is erased too.
+  function remKey() { return CFG.storageKey + '_remember'; }
+  function getRem() { try { return localStorage.getItem(remKey()) || ''; } catch (e) { return ''; } }
+  function setRem(p) { try { if (p) localStorage.setItem(remKey(), p); else localStorage.removeItem(remKey()); } catch (e) {} }
+  function autoUnlock() {
+    if (V.pass) return Promise.resolve(true);
+    var p = getRem(); if (!p) return Promise.resolve(false);
+    return (V.rawRows != null ? Promise.resolve(V.rawRows) : listRows().then(function (raw) { V.rawRows = raw; V.haveRows = raw.length > 0; return raw; }))
+      .then(function (raw) {
+        return unlockWith(p, raw).then(function (rows) {
+          V.pass = p; V.rows = rows; V.salt = rows.length ? unb64(JSON.parse(rows[0].blob).salt) : null; return true;
+        }, function () { setRem(''); return false; });
+      }, function () { return false; });
+  }
   function mk(j, email) { return { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in || 3600) * 1000, email: email || (j.user && j.user.email) || '' }; }
   function call(method, path, body, token, extra) {
     var c = new AbortController(), to = setTimeout(function () { c.abort(); }, 15000);
@@ -226,10 +241,12 @@
   }
   // Used by the device list: push one saved device scenario to the cloud. Needs the passphrase unlocked first.
   window.awrSyncPlan = function (profile) {
-    if (!V.pass) { openPanel(); return Promise.resolve('locked'); }
+    return autoUnlock().then(function (ok) {
+    if (!ok) { openPanel(); return 'locked'; }
     return savePlan(profile).then(function () { return listRows(); }).then(function (raw) { V.rawRows = raw; return unlockWith(V.pass, raw); })
       .then(function (rows) { V.rows = rows; V.haveRows = rows.length > 0; if (rows.length && !V.salt) V.salt = unb64(JSON.parse(rows[0].blob).salt); return 'ok'; })
       .catch(function () { return 'fail'; });
+    });
   };
   window.awrResetPlan = function () { V.planId = null; };
   function deleteRow(rowId) {
@@ -285,13 +302,15 @@
         var p1 = el('input', { type: 'password', autocomplete: 'new-password', id: 'awr-p1' }), p2 = first ? el('input', { type: 'password', autocomplete: 'new-password', id: 'awr-p2' }) : null;
         body.appendChild(el('label', { for: 'awr-p1' }, [t('pass')])); body.appendChild(p1);
         if (p2) { body.appendChild(el('label', { for: 'awr-p2' }, [t('pass2')])); body.appendChild(p2); }
+        var rem = el('input', { type: 'checkbox', id: 'awr-rem' });
+        body.appendChild(el('label', { for: 'awr-rem', style: 'display:flex;gap:8px;align-items:center;margin:10px 0;' }, [rem, t('remember')]));
         var b = el('button', { class: 'awr-btn', type: 'button', onclick: function () {
           if (!cryptoOk()) { say(msg, t('noCrypto'), 'bad'); return; }
           if (p1.value.length < 10) { say(msg, t('tooShort'), 'bad'); return; }
           if (p2 && p1.value !== p2.value) { say(msg, t('mismatch'), 'bad'); return; }
           b.disabled = true; say(msg, t('working'));
           unlockWith(p1.value, V.rawRows || []).then(function (rows) {
-            V.pass = p1.value; V.rows = rows; V.salt = rows.length ? unb64(JSON.parse(rows[0].blob).salt) : null; say(msg, t('unlocked'), 'good'); render();
+            setRem(rem.checked ? p1.value : ''); V.pass = p1.value; V.rows = rows; V.salt = rows.length ? unb64(JSON.parse(rows[0].blob).salt) : null; say(msg, t('unlocked'), 'good'); render();
           }).catch(function () { b.disabled = false; say(msg, t('badPass'), 'bad'); });
         } }, [t('unlock')]);
         body.appendChild(b);
@@ -324,7 +343,7 @@
               .catch(function () { say(msg, t('saveFail'), 'bad'); });
           } }, [t('del')])]));
       });
-      body.appendChild(el('button', { class: 'awr-btn sec', type: 'button', onclick: function () { V.pass = null; V.rows = null; V.salt = null; keyCache = {}; say(msg, ''); render(); } }, [t('lock')]));
+      body.appendChild(el('button', { class: 'awr-btn sec', type: 'button', onclick: function () { setRem(''); V.pass = null; V.rows = null; V.salt = null; keyCache = {}; say(msg, ''); render(); } }, [t('lock')]));
     }
     card.appendChild(el('h2', {}, [t('myPlans')]));
     card.appendChild(el('p', {}, [t('signedInAs') + ' ' + ((S.sess && S.sess.email) || '')]));
@@ -334,8 +353,8 @@
     document.body.appendChild(panel);
     if (V.rawRows == null) {
       say(msg, t('working'));
-      listRows().then(function (raw) { V.rawRows = raw; V.haveRows = raw.length > 0; say(msg, ''); render(); }).catch(function () { say(msg, t('error'), 'bad'); });
-    } else render();
+      listRows().then(function (raw) { V.rawRows = raw; V.haveRows = raw.length > 0; say(msg, ''); return autoUnlock(); }).then(function () { render(); }).catch(function () { say(msg, t('error'), 'bad'); });
+    } else autoUnlock().then(function () { render(); });
   }
   function openPlan(p) {
     if (typeof populateForm !== 'function') return;
@@ -348,7 +367,7 @@
   function signOutDialog() {
     closePanel();
     function finish(clearDevice) {
-      clear(); S.sess = null; V = { pass: null, rows: null, salt: null, haveRows: null, planId: null }; keyCache = {};
+      clear(); setRem(''); S.sess = null; V = { pass: null, rows: null, salt: null, haveRows: null, planId: null }; keyCache = {};
       if (clearDevice) { try { localStorage.removeItem(CFG.profileKey); localStorage.removeItem(CFG.profilesKey); } catch (e) {} }
       location.reload();
     }

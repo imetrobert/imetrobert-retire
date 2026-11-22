@@ -13,6 +13,7 @@ html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
 js = open(os.path.join(ROOT, 'account.js'), encoding='utf-8').read()
 APP = re.search(r"app: '([^']+)'", js).group(1)
 PREFIX = re.search(r"lsPrefix: '([^']+)'", js).group(1)
+REMKEY = re.search(r"storageKey: '([^']+)'", js).group(1) + '_remember'
 PROFILEKEY = re.search(r"profileKey: '([^']+)'", js).group(1)
 FR = "fr: true" in js
 SB = 'https://ipnajvgwtjrlecbqfwrh.supabase.co'
@@ -121,6 +122,22 @@ with sync_playwright() as pw:
     page.click('text=/^Open in the form$|^Ouvrir dans le formulaire$/')
     page.wait_for_timeout(300)
     check(page.input_value('#currentAge') == '61', 'saved plan reopened with its values')
+    # remember the passphrase on this device (opt-in), skipped on the next visit, erased by Lock
+    page.click('#menuBtn'); page.click('#awr-mi-plans'); page.wait_for_selector('#awr-panel .awr-row')
+    page.click('text=/^Lock$|^Verrouiller$/'); page.wait_for_selector('#awr-p1')
+    check(page.evaluate("localStorage.getItem('%s')" % REMKEY) is None, 'passphrase is not remembered by default')
+    page.fill('#awr-p1', 'correct horse battery'); page.check('#awr-rem'); page.click('#awr-panel .awr-btn'); page.wait_for_selector('#awr-panel .awr-row')
+    check(page.evaluate("localStorage.getItem('%s')" % REMKEY) == 'correct horse battery', 'ticking the box remembers the passphrase on this device')
+    page.reload(); page.wait_for_selector('#awr-mi-plans', state='attached')
+    page.click('#menuBtn'); page.click('#awr-mi-plans'); page.wait_for_selector('#awr-panel .awr-row')
+    check(page.locator('#awr-p1').count() == 0, 'remembered passphrase unlocks without asking')
+    page.click('text=/^Lock$|^Verrouiller$/'); page.wait_for_selector('#awr-p1')
+    check(page.evaluate("localStorage.getItem('%s')" % REMKEY) is None, 'Lock forgets the remembered passphrase')
+    page.evaluate("localStorage.setItem('%s', 'a wrong passphrase')" % REMKEY); page.reload(); page.wait_for_selector('#awr-mi-plans', state='attached')
+    page.click('#menuBtn'); page.click('#awr-mi-plans'); page.wait_for_selector('#awr-p1')
+    check(page.evaluate("localStorage.getItem('%s')" % REMKEY) is None, 'a wrong remembered passphrase is erased and the passphrase is asked')
+    page.fill('#awr-p1', 'correct horse battery'); page.click('#awr-panel .awr-btn'); page.wait_for_selector('#awr-panel .awr-row')
+    page.click('#awr-panel >> text=/^Close$|^Fermer$/')
     # sign out and clear device plans
     page.click('#menuBtn'); page.click('#awr-mi-plans'); page.click('text=/^Sign out$|^Se déconnecter$/'); page.click('#awr-so-clear'); page.click('#awr-so-clear')
     page.wait_for_selector('#awr-gate')

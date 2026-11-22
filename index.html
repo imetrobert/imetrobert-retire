@@ -6158,8 +6158,6 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<span class="exp-note">Enter today\'s money. These costs are raised for inflation each year as the plan moves forward.</span>'
             + '<span class="exp-note">Each expense has its own frequency (some bills are weekly, monthly or yearly). Enter the amount as you are billed.</span>'
             + '<label for="expAllFreq">Set all rows to</label><div class="exp-btns"><select id="expAllFreq"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select><button type="button" class="secondary" onclick="expSetAllFreq()">Set all rows</button></div>'
-            + '<label for="expFreq">Show my spending goal (Step 2) per</label>'
-            + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select>'
             + '<div id="expHhBox" hidden>'
             + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
             + '<div id="expShareBox" hidden><span class="exp-note" id="expCoupleNote" hidden>Each row has two boxes, one for each of you. Change either one and the other adjusts so they always add up to 100%. Leave both blank to use the automatic split. Your spouse can change these too: tap their name, then "Household expenses".</span><span class="exp-note" id="expShareNote">You live with others, so enter the % of each expense that you pay. The other box shows the rest (spouse or others) and adjusts with it. Blank means you pay 100%. Only your share goes into the plan.</span>'
@@ -6180,7 +6178,6 @@ The numbers in that example are placeholders from a prior year — replace every
         if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount, freq: i.freq, pct: (i.pct === null || i.pct === undefined) ? '' : i.pct })) }; }
         while (expDraft.items.length < 3) expDraft.items.push({ name: '', amount: '', freq: 'monthly' });
         const sh = buildExpSheet();
-        document.getElementById('expFreq').value = expDraft.freq;
         document.getElementById('expErr').hidden = true;
         { const sb = document.getElementById('expShareBox'); if (sb) { sb.hidden = !(expShareMode() || hhIsCouple()); document.getElementById('expShareMsg').textContent = ''; const cp = hhIsCouple(); document.getElementById('expShareNote').hidden = cp; document.getElementById('expCoupleNote').hidden = !cp; document.getElementById('expAllPctLbl').textContent = cp ? 'My share of all expenses (%), the rest is my spouse\'s' : 'My share of all expenses (%)'; } }
         { const hb = document.getElementById('expHhBox'); if (hb) { hb.hidden = !hhIsCouple(); document.getElementById('expRec').textContent = ''; } }
@@ -6192,7 +6189,6 @@ The numbers in that example are placeholders from a prior year — replace every
     function closeExp() { const sh = document.getElementById('expSheet'); if (sh) sh.classList.remove('open'); }
     function expCancel() { expDraft = null; closeExp(); }
     function expToEvents() { closeExp(); showStep(7); }   // the draft is kept, so reopening the list shows it again
-    function expFreqChange() { const v = document.getElementById('expFreq').value; expDraft.freq = (v === 'weekly' || v === 'yearly') ? v : 'monthly'; expUpdateTotal(); }
     // Paste a list (one "name amount" per line, e.g. copied from a spreadsheet): adds a row per line with a positive amount.
     function expPasteRows() {
         const box = document.getElementById('expPaste'), msg = document.getElementById('expPasteMsg'); let added = 0, skipped = 0;
