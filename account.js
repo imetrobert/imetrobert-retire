@@ -252,8 +252,8 @@
     } }, [el('label', { for: 'awr-email' }, [t('email')]), email, el('label', { for: 'awr-pw' }, [t('password')]), pw, btn, msg]);
     var kids = [el('h2', {}, [CFG.name]), el('h3', {}, [t('title')]), el('p', {}, [t('sub')]), form];
     if (CFG.requestAccess !== false && CFG.siteUrl) {
-      var reqHref = 'mailto:robert@imetrobert.com?subject=' + encodeURIComponent(t('reqSubject') + CFG.name) + '&body=' + encodeURIComponent(t('reqBody1') + CFG.name + ' (' + CFG.siteUrl + ')' + t('reqBody2'));
-      kids.push(el('p', { class: 'awr-req' }, [t('reqA'), el('a', { href: reqHref }, ['robert@imetrobert.com']), t('reqB')]));
+      var reqHref = 'mailto:robert@aiwithrobert.com?subject=' + encodeURIComponent(t('reqSubject') + CFG.name) + '&body=' + encodeURIComponent(t('reqBody1') + CFG.name + ' (' + CFG.siteUrl + ')' + t('reqBody2'));
+      kids.push(el('p', { class: 'awr-req' }, [t('reqA'), el('a', { href: reqHref }, ['robert@aiwithrobert.com']), t('reqB')]));
     }
     if (CFG.fr) kids.push(el('button', { class: 'awr-link', type: 'button', onclick: function () { try { localStorage.setItem(CFG.langKey, lang() === 'fr' ? 'en' : 'fr'); } catch (e) {} showGate(msgKey); } }, [t('lang')]));
     g = el('div', { id: 'awr-gate' }, [el('div', { class: 'awr-card' }, kids)]);
