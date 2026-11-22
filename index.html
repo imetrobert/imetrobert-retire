@@ -3988,7 +3988,7 @@ The numbers in that example are placeholders from a prior year — replace every
             let eventsThisYear = oneTimeEventsThisYear.concat(recurringEventsThisYear);
             let eventTotalThisYear = eventsThisYear.reduce((sum, e) => sum + e.amount * idxY, 0);
             let eventNamesThisYear = eventsThisYear.map(e => e.name || 'Unnamed event');
-            let eventDetailsThisYear = eventsThisYear.map(e => ({ name: e.name || 'Unnamed event', today: e.amount, future: e.amount * idxY }));
+            let eventDetailsThisYear = eventsThisYear.map(e => ({ name: e.name || 'Unnamed event', today: e.amount, future: e.amount * idxY, rec: recurringEventsThisYear.indexOf(e) >= 0 }));
             let eventTfsaDraw = 0, eventNonRegDraw = 0, eventRegisteredNeed = 0;
             if (eventTotalThisYear > 0) {
                 let remaining = eventTotalThisYear;
@@ -5408,7 +5408,13 @@ The numbers in that example are placeholders from a prior year — replace every
                 const bv = balOf(lbl);
                 acctHtml += '<div class="yp-acct"><div class="yp-ah"><span>' + lbl + '</span><b>' + (has(x.wd) ? 'Withdraw ' + fmtNum(x.wd) : (has(x.recv) ? 'Receives ' + fmtNum(x.recv) : 'No withdrawal')) + '</b></div>';
                 if (has(x.inc)) acctHtml += '<div class="yp-al">Goes to living costs <b>' + fmtNum(x.inc) + '</b></div>';
-                if (has(x.evt)) acctHtml += '<div class="yp-al">Goes to one-time costs <b>' + fmtNum(x.evt) + '</b></div>';
+                if (has(x.evt)) {
+                    acctHtml += '<div class="yp-al">Goes to life events <b>' + fmtNum(x.evt) + '</b></div>';
+                    // Which events this withdrawal pays for: shared in proportion to each event's cost this year.
+                    const evDet = (r.eventDetailsThisYear && r.eventDetailsThisYear.length) ? r.eventDetailsThisYear : [{ name: (r.eventNamesThisYear || []).join(', ') || 'Life event', future: 1 }];
+                    const evSum = evDet.reduce((t, e) => t + (e.future || 0), 0) || 1;
+                    evDet.forEach(e => { acctHtml += '<div class="yp-al" style="padding-left:14px;font-size:.92em;">' + escHtml(e.name) + ' <b>' + fmtNum(x.evt * (e.future || 0) / evSum) + '</b></div>'; });
+                }
                 if (has(x.tax)) acctHtml += '<div class="yp-al">Goes to tax <b>' + fmtNum(x.tax) + '</b></div>';
                 if (has(x.wd)) { const w = whOf(lbl); if (has(w)) acctHtml += '<div class="yp-al wht">The bank withholds ' + fmtNum(w) + ', which will automatically be used to pay part of your tax owed for the year. So you will receive ' + fmtNum(Math.max(0, x.wd - w)) + ' in pocket.' + (() => { const rest = Math.max(0, x.wd - w), need = Math.max(0, (x.tax || 0) - w); if (!has(need)) return ''; return need >= rest - 0.5 ? ' All of it is needed to pay the rest of your yearly tax bill, so set it aside.' : ' Of that, ' + fmtNum(need) + ' is needed to pay the rest of your yearly tax bill, so set it aside.'; })() + '</div>'; else if (has(x.tax)) acctHtml += '<div class="yp-al wht">There is no withholding tax, so put this money aside: it is needed to pay your tax bill.</div>'; }
                 if (has(x.tr)) {
