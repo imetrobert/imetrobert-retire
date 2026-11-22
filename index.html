@@ -496,17 +496,24 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
 <main class="container">
 
     <div id="quizForm">
+        <div id="hhBar" class="hh-bar" hidden><span>Filling in:</span><button type="button" class="hh-seg active" id="hhBtnMe" onclick="hhSwitch('me')">You</button><button type="button" class="hh-seg" id="hhBtnSp" onclick="hhSwitch('spouse')">Your spouse</button><div class="hh-note"><span id="hhNote1"></span><span id="hhNote2"></span><span id="hhNote3"></span></div></div>
         <div class="question-step active" data-step="1">
             <div class="step-head"><div class="eyebrow">Step 1 of 3</div><h2>About you</h2><p>Two minutes. You can change anything later.</p></div>
             <label for="profileName">Name this plan (optional)</label>
             <input type="text" id="profileName" maxlength="60" placeholder="e.g. Base case, Retire at 55, Bear market test">
 
-            <label for="calcMode">Who is this plan for?</label>
+            <label for="calcMode">Are you filling this out for you, or for you and a spouse?</label>
             <select id="calcMode" onchange="toggleSpouseMode()">
                 <option value="single">Just me</option>
                 <option value="couple">Me and my spouse</option>
             </select>
-            <span class="note-text">Stand-Alone ignores your spouse's income entirely (RREGOP, QPP, OAS, TFSA). If you have a spouse, use the Joint analysis for a complete picture.</span>
+            <span class="note-text">If you choose both, you fill in your own details first, then your spouse's separately. They are only combined on the results screen, in a household view.</span>
+            <div id="hhNamesRow" class="hh-names" hidden>
+                <label for="hhNameMe">Your first name (optional)</label>
+                <input type="text" id="hhNameMe" maxlength="30" oninput="hhNameInput()">
+                <label for="hhNameSp">Your spouse's first name (optional)</label>
+                <input type="text" id="hhNameSp" maxlength="30" oninput="hhNameInput()">
+            </div>
             <label for="livesAlone">Do you live alone?</label>
             <select id="livesAlone">
                 <option value="yes">Yes, I live alone</option>
@@ -943,6 +950,9 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                 <button type="button" class="save-btn" style="min-height:42px;padding:0 1rem;" onclick="calculateRetirementPlan()">Recalculate</button>
             </div>
 
+            <div id="hhTabs" class="seg" role="group" aria-label="Household view" hidden><button type="button" class="seg-btn active" data-v="house" onclick="hhShowView('house')">Household</button><button type="button" class="seg-btn" data-v="me" id="hhTabsMe" onclick="hhShowView('me')">You</button><button type="button" class="seg-btn" data-v="sp" id="hhTabsSp" onclick="hhShowView('sp')">Your spouse</button></div>
+            <span class="note-text" id="hhViewNote" hidden></span>
+            <div id="hhPanel" hidden></div>
             <div id="heroSummary"></div>
             <details class="tipbox resultnote"><summary>ⓘ More about this result</summary><div><div id="deficitReportBanner"></div>
             <div id="mcReportBanner"></div></div></details>
@@ -2511,7 +2521,7 @@ The numbers in that example are placeholders from a prior year — replace every
         localStorage.removeItem('csl_retire_profile_v2026');
     };
 
-    function populateForm(p) {
+    function populateFormRaw(p) {
         document.getElementById('profileName').value = p.name || '';
         document.getElementById('calcMode').value = p.calcMode || 'single';
         document.getElementById('currentAge').value = p.currentAge ?? 55;
@@ -2671,11 +2681,10 @@ The numbers in that example are placeholders from a prior year — replace every
         document.getElementById('recur' + n + 'Month').value = 1;
     }
 
-    function toggleSpouseMode() {
-        const mode = document.getElementById('calcMode').value;
-        const isCouple = mode === 'couple';
-        document.getElementById('spouseBlock').style.display = isCouple ? 'block' : 'none';
-        document.getElementById('spouseAssetBlock').style.display = isCouple ? 'block' : 'none';
+    function toggleSpouseMode() {   // the old joint-entry blocks stay hidden: a spouse now fills in their own full form (household mode)
+        document.getElementById('spouseBlock').style.display = 'none';
+        document.getElementById('spouseAssetBlock').style.display = 'none';
+        if (typeof hhOnMode === 'function') hhOnMode();
     }
 
     function toggleReturnSubConfigs() {
@@ -2724,6 +2733,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const target = document.querySelector(`.question-step[data-step="${step}"]`);
         if (target) {
             target.classList.add('active');
+            if (typeof hhUi === 'function') hhUi();
             currentStep = step > 3 ? 3 : step;
             if (step <= 3) updateProgress();
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3016,7 +3026,7 @@ The numbers in that example are placeholders from a prior year — replace every
     // Number from a field; only a blank/invalid entry falls back to the default, so a typed 0 stays 0.
     function numOr(id, fallback) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? fallback : v; }
 
-    function getProfileData() {
+    function getFormProfile() {
         // Reuse the id of whatever profile is currently loaded so repeated
         // "Save" clicks while working through the wizard update the SAME
         // archived entry instead of creating a pile of partial in-progress
@@ -3040,7 +3050,7 @@ The numbers in that example are placeholders from a prior year — replace every
             spouseAge: parseFloat(document.getElementById('spouseAge').value) || 0,
             spendFrequency: document.getElementById('spendFrequency').value,
             spendAmount: expState().on ? expTotal(EXP.items) : (parseFloat(document.getElementById('spendAmount').value) || 0),
-            expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount })),
+            expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount, pct: (i.pct === undefined ? null : i.pct) })),
 
             currentRrsp: parseFloat(document.getElementById('currentRrsp').value) || 0,
             contribRrsp: parseFloat(document.getElementById('contribRrsp').value) || 0,
@@ -4354,41 +4364,13 @@ The numbers in that example are placeholders from a prior year — replace every
         };
     }
 
-    function calculateRetirementPlan() {
-        const p = getProfileData();
+    function calculateRetirementPlanCore() {
+        const p = hhActiveProfile || getProfileData();
         const taxRules = getTaxRules();
         saveProfileProgress();
 
-        let chosenQppAge = p.qppStartAge;
-        let chosenOasAge = p.oasStartAge;
-        let optimizationMessage = "";
-
-        if (p.optimizerMode === 'auto') {
-            let bestScore = -Infinity, bestQpp = 65, bestOas = 65;
-            const useMc = p.returnModel === 'montecarlo';
-            const scoringTrials = 40;
-
-            const qLo = p.alreadyRetired ? Math.min(70, Math.max(60, p.currentAge)) : 60;
-            const oLo = p.alreadyRetired ? Math.min(70, Math.max(65, p.currentAge)) : 65;
-            for (let q = qLo; q <= 70; q++) {
-                for (let o = oLo; o <= 70; o++) {
-                    let score;
-                    if (useMc) {
-                        const mc = withRepeatableRandom(p.mcRepeatable, () => runMonteCarlo(p, q, o, taxRules, scoringTrials));
-                        score = mc.successRate * 1e9 + mc.p50Portfolio - mc.avgTotalTaxesPaid * 0.2;
-                    } else {
-                        let sim = runSimulation(p, q, o, taxRules);
-                        score = (sim.depletionAge === null ? 1000000 : sim.depletionAge * 10000) + sim.finalPortfolio - (sim.totalTaxesPaid * 0.2);
-                    }
-                    if (score > bestScore) { bestScore = score; bestQpp = q; bestOas = o; }
-                }
-            }
-            chosenQppAge = bestQpp;
-            chosenOasAge = bestOas;
-            optimizationMessage = `🤖 <strong>Optimizer Active:</strong> Evaluated all QPP (60–70) &amp; OAS (65–70) start-age permutations for you. Selected <strong>QPP at Age ${chosenQppAge}</strong> and <strong>OAS at Age ${chosenOasAge}</strong>` + (p.calcMode === 'couple' ? ` (your spouse's start ages are used as entered, not auto-optimized).` : `.`);
-        } else {
-            optimizationMessage = `⚙️ <strong>Manual Configuration Active:</strong> Using your manual QPP start age ${chosenQppAge} and OAS start age ${chosenOasAge}.`;
-        }
+        const __ch = hhChooseAges(p, taxRules);
+        let chosenQppAge = __ch.q, chosenOasAge = __ch.o, optimizationMessage = __ch.msg;
 
         const finalRun = withRepeatableRandom(p.mcRepeatable && p.returnModel === 'montecarlo', () => runSimulation(p, chosenQppAge, chosenOasAge, taxRules, true));
         lastFinalRun = finalRun;
@@ -4531,7 +4513,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const retDuration = Math.max(0, p.lifeExpectancy - p.targetAge);
 
         let summaryHtml = `
-            <p><strong>Analysis Mode:</strong> ${p.calcMode === 'couple' ? 'Joint Household (You &amp; Your Spouse)' : 'Stand-Alone Individual'}</p>
+            <p><strong>Analysis Mode:</strong> ${p.hhRole ? 'Household member (own plan, share of household spending)' : (p.calcMode === 'couple' ? 'Joint Household (You &amp; Your Spouse)' : 'Stand-Alone Individual')}</p>
             ${(p.inflationMode || 'none') === 'none'
                 ? `<p><strong>All figures in today's constant dollars (no inflation):</strong> this projection assumes the return rates you entered are already inflation-adjusted (real), so spending, pensions, and tax brackets are held flat throughout. If you entered nominal (headline) returns instead, this plan is more optimistic than reality.</p>`
                 : `<p><strong>Inflation is ON:</strong> your spending, QPP/OAS and tax parameters rise each year, and the table is shown in ${p.showRealDollars ? "today's dollars" : 'future dollars (the amounts you will actually see)'}.</p>`}
@@ -5430,6 +5412,312 @@ The numbers in that example are placeholders from a prior year — replace every
 
 
     // ---- Information pop-ups: long notes become a small "More info" button that opens a bottom sheet ----
+    // ---- Household mode: you and a spouse each fill in the SAME form separately; results merge them ----
+    // HH.me / HH.spouse hold each person's full profile. The form shows one of them (HH.who). Household settings
+    // (spending, inflation, returns) live in HH.me and are greyed out in the spouse's view. Each person's plan runs as a
+    // normal single-person plan on their share of the household spending; the Household tab only adds the two together.
+    var HH = { me: null, spouse: null, who: 'me', split: '', visited: false, view: 'house', plans: null, prof: null, shareMe: 50, shareAuto: 50, expShare: null, legacy: '', names: { me: '', sp: '' } };
+    var hhActiveProfile = null;
+    var HH_KEYS = ['name', 'spendFrequency', 'spendAmount', 'expenseOn', 'expenseFreq', 'expenseItems', 'inflationMode', 'inflationPct', 'returnBasis', 'showRealDollars',
+        'returnPre', 'returnModel', 'returnPost', 'mcAvgReturn', 'mcVolatility', 'mcVolSource', 'mcVolBasis', 'mcRepeatable', 'portfolioStats', 'customSeqType', 'customFallbackReturn'];
+    var HH_IDS = ['spendFrequency', 'spendAmount', 'inflationMode', 'inflationPct', 'returnBasis', 'showRealDollars', 'returnPre', 'returnModel', 'returnPost', 'mcAvgReturn',
+        'mcVolatility', 'mcVolSource', 'mcVolBasis', 'mcRepeatable', 'customSeqType', 'customFallbackReturn', 'calcMode', 'profileName'];
+    (function () {
+        const st = document.createElement('style');
+        st.textContent = '.hh-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;padding:8px 10px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;font-size:13px;color:#1e3a8a}'
+            + '.hh-bar[hidden]{display:none}.hh-bar .hh-seg{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #93c5fd;background:#fff;color:#1e3a8a;font-weight:700;box-shadow:none}.hh-bar .hh-seg.active{background:#1e3a8a;color:#fff;border-color:#1e3a8a}'
+            + '.hh-bar .hh-note{flex:1 1 100%;font-size:12px;line-height:1.4;color:#475569}.hh-bar .hh-note span{display:block}'
+            + '.hh-names[hidden]{display:none}#hhTabs[hidden],#hhPanel[hidden]{display:none}.hh-hide{display:none !important}'
+            + '.hh-cards{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hh-card{flex:1 1 30%;min-width:96px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px}.hh-card small{display:block;color:#64748b;font-size:11px}.hh-card b{display:block;font-size:17px;color:#0f172a}.hh-card span{font-size:11px;color:#64748b}'
+            + '.hh-split{margin:8px 0}.hh-split input{width:110px;display:inline-block;margin:0 6px}.hh-status{margin:4px 0;font-size:13px}'
+            + '.hh-tablewrap{overflow-x:auto;margin:8px 0}.hh-table{border-collapse:collapse;width:100%;min-width:640px;font-size:12px}.hh-table th,.hh-table td{border-bottom:1px solid #e2e8f0;padding:5px 6px;text-align:right;vertical-align:top}.hh-table th{background:#f1f5f9;position:sticky;top:0}.hh-table td:first-child,.hh-table th:first-child{text-align:left}.hh-table td small{display:block;color:#64748b;font-size:10.5px;white-space:nowrap}.hh-table td small i{font-style:normal}.hh-table tr.hh-short td{background:#fff7ed}'
+            + '#expSheet .exp-row .ep{flex:0 0 62px}#expSheet .exp-rec{font-size:13px;color:#1e3a8a;margin:6px 0}';
+        document.head.appendChild(st);
+    })();
+    function hhIsCouple() { const c = document.getElementById('calcMode'); return !!c && c.value === 'couple'; }
+    function hhEsc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function hhLabel(k) { const n = String((HH.names && HH.names[k]) || '').trim(); return n || (k === 'me' ? 'You' : 'Your spouse'); }
+    function hhClone(v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); }
+    function hhPick(src) { const o = {}; HH_KEYS.forEach(k => { if (src && k in src) o[k] = hhClone(src[k]); }); return o; }
+    function hhStrip(p) { const o = hhClone(p) || {}; ['id', 'timestamp', 'timestampMs', 'name', 'hhSpouse', 'hhSplit', 'hhNames'].forEach(k => delete o[k]); return o; }
+    function hhBlank(me) {
+        const s = hhClone(me) || {}; delete s.hhSpouse; delete s.id; s.name = '';
+        ['currentRrsp', 'contribRrsp', 'currentTfsa', 'contribTfsa', 'liraBalance', 'contribLira', 'fedDcBalance', 'contribFedDc', 'ftqBalance', 'contribFtq', 'currentNonReg', 'contribNonReg', 'ownPensionAnnual', 'extraRegAmt', 'tfsaRoomNow']
+            .forEach(k => { if (k in s) s[k] = 0; });
+        s.events = []; s.recurringEvents = []; s.rlifUnlockEnabled = false; s.livesAlone = 'no'; s.calcMode = 'couple'; s.alreadyRetired = false;
+        return s;
+    }
+    function hhFromLegacy(p) {   // plans saved before household mode kept the spouse in a few fields on the same form
+        const s = hhBlank(p);
+        if (p.spouseAge) s.currentAge = p.spouseAge;
+        s.targetAge = p.spouseRetirementAge || p.targetAge;
+        s.qppMonthlyAmt = p.spouseQppMonthlyAmt || 0;
+        s.oasMonthlyAmt = (p.spouseOasMonthlyAmt != null && p.spouseOasMonthlyAmt !== 0) ? p.spouseOasMonthlyAmt : s.oasMonthlyAmt;
+        s.qppStartAge = p.spouseQppStartAge || 65; s.oasStartAge = p.spouseOasStartAge || 65;
+        s.currentTfsa = p.spouseTfsa || 0; s.contribTfsa = p.spouseContribTfsa || 0; s.optimizerMode = 'manual';
+        HH.legacy = (p.spouseRregopSalary > 0) ? 'pension' : 'yes';
+        return s;
+    }
+    function hhEnsureSpouse() { if (!HH.spouse) { HH.spouse = hhBlank(HH.who === 'me' ? getFormProfile() : HH.me); HH.visited = false; } }
+    function getProfileData() {
+        const raw = getFormProfile();
+        if (raw.calcMode !== 'couple') { HH.me = raw; return raw; }
+        hhEnsureSpouse();
+        let me;
+        if (HH.who === 'spouse') { HH.spouse = raw; me = Object.assign({}, HH.me); }
+        else { HH.me = raw; me = raw; }
+        me.hhSpouse = hhStrip(HH.spouse); me.hhSplit = HH.split; me.hhNames = { me: HH.names.me, sp: HH.names.sp };
+        return me;
+    }
+    function populateForm(p) {
+        HH.who = 'me'; HH.me = p; HH.split = (p && p.hhSplit) || ''; HH.view = 'house'; HH.plans = null; HH.legacy = '';
+        HH.names = { me: String((p && p.hhNames && p.hhNames.me) || ''), sp: String((p && p.hhNames && p.hhNames.sp) || '') };
+        if (p && p.calcMode === 'couple') {
+            if (p.hhSpouse) { HH.spouse = Object.assign(hhBlank(p), p.hhSpouse, { calcMode: 'couple' }); HH.visited = true; }
+            else { HH.spouse = hhFromLegacy(p); HH.visited = true; }
+        } else { HH.spouse = null; HH.visited = false; }
+        populateFormRaw(p);
+        const a = document.getElementById('hhNameMe'), b = document.getElementById('hhNameSp');
+        if (a) a.value = HH.names.me; if (b) b.value = HH.names.sp;
+        hhUi();
+    }
+    function hhOnMode() {
+        if (hhIsCouple()) { hhEnsureSpouse(); } else { HH.spouse = null; HH.who = 'me'; HH.visited = false; HH.plans = null; }
+        hhUi();
+    }
+    function hhNameInput() {
+        HH.names.me = (document.getElementById('hhNameMe').value || '').slice(0, 30); HH.names.sp = (document.getElementById('hhNameSp').value || '').slice(0, 30);
+        hhUi();
+    }
+    function hhUi() {
+        const couple = hhIsCouple(), bar = document.getElementById('hhBar'); if (!bar) return;
+        const stepEl = document.querySelector('.question-step.active'), sn = stepEl ? parseInt(stepEl.getAttribute('data-step'), 10) : 1;
+        const sp = couple && HH.who === 'spouse';
+        bar.hidden = !(couple && sn <= 3);
+        document.getElementById('hhBtnMe').textContent = hhLabel('me'); document.getElementById('hhBtnSp').textContent = hhLabel('sp');
+        document.getElementById('hhBtnMe').classList.toggle('active', !sp); document.getElementById('hhBtnSp').classList.toggle('active', sp);
+        document.getElementById('hhNote1').textContent = sp
+            ? 'Spending, inflation and returns are household settings: enter them once, in your own form. They are shown greyed out here.'
+            : 'Your spouse\'s details are entered separately: tap the other name above when you are done with yours.';
+        document.getElementById('hhNote2').textContent = HH.legacy ? 'Your spouse\'s form was built from your earlier joint entries. Please review it.' : '';
+        document.getElementById('hhNote3').textContent = HH.legacy === 'pension' ? 'An employer pension for your spouse was not carried over: enter it in their form.' : '';
+        const nr = document.getElementById('hhNamesRow'); if (nr) nr.hidden = !couple;
+        ['hhTabsMe', 'hhTabsSp'].forEach((id, i) => { const b = document.getElementById(id); if (b) b.textContent = hhLabel(i ? 'sp' : 'me'); });
+        HH_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = sp; });
+        if (!sp && typeof expSync === 'function') expSync();
+        const lr = document.getElementById('expLinkRow'); if (lr && sp) lr.style.display = 'none';
+        const lb = document.querySelector('#expLockBox .exp-lock-b'); if (lb) lb.style.display = sp ? 'none' : '';
+    }
+    function hhSwitch(to) {
+        if (!hhIsCouple() || to === HH.who) return;
+        getProfileData();
+        hhEnsureSpouse(); HH.who = to;
+        if (to === 'spouse') { HH.visited = true; HH.spouse = Object.assign({}, HH.spouse, hhPick(HH.me), { calcMode: 'couple' }); populateFormRaw(HH.spouse); }
+        else populateFormRaw(HH.me);
+        hhUi(); showStep(1);
+    }
+    function hhCap(p) {
+        const g = ((p.qppMonthlyAmt || 0) + (p.oasMonthlyAmt || 0)) * 12 + (p.ownPensionAnnual || 0);
+        const sav = (p.currentRrsp || 0) + (p.currentTfsa || 0) + (p.currentNonReg || 0) + (p.liraBalance || 0) + (p.fedDcBalance || 0) + (p.ftqBalance || 0);
+        return g + 0.04 * sav;
+    }
+    function hhShares(me, sp) {   // my share of the household spending, in whole percent
+        const a = hhCap(me), b = hhCap(sp);
+        if (!(a + b > 0)) return 50;
+        return Math.min(99, Math.max(1, Math.round(100 * a / (a + b))));
+    }
+    function hhExpenseShare(me, autoPct) {   // my share implied by "who pays" boxes in the expense list, or null
+        if (!me.expenseOn || !Array.isArray(me.expenseItems)) return null;
+        if (!me.expenseItems.some(i => i && i.pct !== null && i.pct !== undefined && i.pct !== '')) return null;
+        let tot = 0, mine = 0;
+        me.expenseItems.forEach(i => { const a = parseFloat(i.amount) || 0, pc = (i.pct === null || i.pct === undefined || i.pct === '') ? autoPct : parseFloat(i.pct); tot += a; mine += a * Math.min(100, Math.max(0, pc)) / 100; });
+        return tot > 0 ? 100 * mine / tot : null;
+    }
+    function hhMk(p, pct, total, freq, role) {
+        const o = hhClone(p); delete o.hhSpouse;
+        return Object.assign(o, { calcMode: 'single', livesAlone: 'no', spendFrequency: freq, spendAmount: Math.round(total * pct) / 100, expenseOn: false, hhRole: role });
+    }
+    function hhPlanProfiles(opts) {
+        opts = opts || {};
+        getProfileData();
+        const me = HH.me, sp = Object.assign({}, HH.spouse, hhPick(me), { calcMode: 'couple' });
+        HH.shareAuto = hhShares(me, sp);
+        HH.expShare = hhExpenseShare(me, HH.shareAuto);
+        let pct = opts.pct != null ? opts.pct : (HH.expShare != null ? HH.expShare : (HH.split !== '' && HH.split != null ? Math.min(99, Math.max(1, parseFloat(HH.split) || HH.shareAuto)) : HH.shareAuto));
+        HH.shareMe = pct;
+        const total = opts.total != null ? opts.total : me.spendAmount, freq = opts.freq || me.spendFrequency;
+        return { me: hhMk(me, pct, total, freq, 'You'), sp: hhMk(sp, 100 - pct, total, freq, 'Your spouse') };
+    }
+    function hhPlanFor(p, rules) {
+        const ch = hhChooseAges(p, rules);
+        const run = withRepeatableRandom(p.mcRepeatable && p.returnModel === 'montecarlo', () => runSimulation(p, ch.q, ch.o, rules, true));
+        return { p: p, q: ch.q, o: ch.o, run: run };
+    }
+    function hhNeedSpouse() {
+        hhSwitch('spouse');
+        showInfo('Now your spouse', 'Fill in your spouse\'s own details (age, accounts, pensions) in steps 1 to 3, then tap Show my plan again. Spending, inflation and returns are entered once, in your own form.');
+    }
+    function calculateRetirementPlan(view) {
+        if (!hhIsCouple()) { const t = document.getElementById('hhTabs'); if (t) t.hidden = true; const pn = document.getElementById('hhPanel'); if (pn) pn.hidden = true; hhSiblings(false); HH.plans = null; return calculateRetirementPlanCore(); }
+        return hhCalculate(typeof view === 'string' ? view : undefined);
+    }
+    function hhCalculate(view) {
+        getProfileData();
+        if (!HH.visited) { hhNeedSpouse(); return; }
+        const rules = getTaxRules();
+        HH.prof = hhPlanProfiles();
+        HH.plans = { me: hhPlanFor(HH.prof.me, rules), sp: hhPlanFor(HH.prof.sp, rules) };
+        saveProfileProgress();
+        document.getElementById('hhTabs').hidden = false;
+        hhUi();
+        hhShowView(view || HH.view || 'house');
+    }
+    function hhSiblings(hide) {
+        const st = document.querySelector('.question-step[data-step="4"]'); if (!st) return;
+        Array.prototype.forEach.call(st.children, c => { if (c.id === 'hhTabs' || c.id === 'hhPanel' || c.id === 'hhViewNote' || c.classList.contains('results-head')) return; c.classList.toggle('hh-hide', hide); });
+    }
+    function hhShowView(v) {
+        if (!HH.plans) return;
+        HH.view = v;
+        document.querySelectorAll('#hhTabs .seg-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-v') === v));
+        const note = document.getElementById('hhViewNote');
+        if (v === 'house') {
+            showStep(4); hhRenderHouse();
+            document.getElementById('hhPanel').hidden = false; note.hidden = true; hhSiblings(true);
+        } else {
+            document.getElementById('hhPanel').hidden = true; hhSiblings(false);
+            hhActiveProfile = HH.prof[v];
+            try { calculateRetirementPlanCore(); } finally { hhActiveProfile = null; }
+            note.hidden = false; note.textContent = v === 'me' ? 'Your own plan, run on your share of the household spending.' : 'Your spouse\'s own plan, run on their share of the household spending.';
+            hhUi();
+        }
+    }
+    function hhSetSplit() {
+        const v = document.getElementById('hhSplitIn').value;
+        HH.split = (v === '' || isNaN(parseFloat(v))) ? '' : String(Math.min(99, Math.max(1, Math.round(parseFloat(v)))));
+        hhCalculate('house');
+    }
+    function hhBal(r) { return (r.simRrsp || 0) + (r.simRlifUnlocked || 0) + (r.simLira || 0) + (r.simNonReg || 0) + (r.simFtq || 0) + (r.simTfsa || 0); }
+    function hhRenderHouse() {
+        const fmt = v => '$' + Math.round(v).toLocaleString();
+        const A = HH.plans.me, B = HH.plans.sp, me = HH.me, real = !!me.showRealDollars;
+        const rA = scaleRowsForDisplay(A.run.scheduleRows, real), rB = scaleRowsForDisplay(B.run.scheduleRows, real);
+        const n = Math.max(rA.length, rB.length), y0 = new Date().getFullYear();
+        const annual = getAnnualNetNeed(me), pct = HH.shareMe, nm = hhEsc(hhLabel('me')), ns = hhEsc(hhLabel('sp'));
+        const take = r => ['rrspDraw', 'liraDraw', 'rlifUnlockedDraw', 'ftqDraw', 'nonRegDraw', 'tfsaDraw'].reduce((s, k) => s + (r[k] || 0), 0);
+        const acc = r => [['RRSP/RRIF', r.rrspDraw], ['Locked-in', r.liraDraw], ['Unlocked', r.rlifUnlockedDraw], ['FTQ', r.ftqDraw], ['Non-reg.', r.nonRegDraw], ['TFSA', r.tfsaDraw]]
+            .filter(x => (x[1] || 0) > 0.5).map(x => '<span class="hh-ac"><i>' + x[0] + '</i> <span>' + fmt(x[1]) + '</span></span>').join('<span> · </span>');
+        const gov = r => (r.qppInc != null ? r.qppInc : 0) + (r.oasIncGross || 0) + (r.pensionInc || 0);
+        const cell = r => r ? '<td><b>' + fmt(take(r)) + '</b><small>' + (acc(r) || '–') + '</small><small><i>Benefits &amp; pension</i> <span>' + fmt(gov(r)) + '</span></small></td>' : '<td>–</td>';
+        let rows = '', taxTot = 0;
+        for (let i = 0; i < n; i++) {
+            const a = rA[i], b = rB[i];
+            const need = (a ? (a.targetSpend || 0) + (a.eventTotalThisYear || 0) : 0) + (b ? (b.targetSpend || 0) + (b.eventTotalThisYear || 0) : 0);
+            const net = (a ? a.actualNetTakeHome || 0 : 0) + (b ? b.actualNetTakeHome || 0 : 0);
+            const tax = (a ? (a.taxPaid || 0) + (a.clawback || 0) : 0) + (b ? (b.taxPaid || 0) + (b.clawback || 0) : 0);
+            taxTot += tax;
+            rows += '<tr' + (net < need * 0.98 ? ' class="hh-short"' : '') + '><td>' + (y0 + i) + '</td><td>' + (a ? a.age : '–') + ' / ' + (b ? b.age : '–') + '</td><td>' + fmt(need) + '</td><td>' + fmt(net) + '</td><td>' + fmt(tax) + '</td>'
+                + cell(a) + cell(b) + '<td>' + fmt((a ? hhBal(a) : 0) + (b ? hhBal(b) : 0)) + '</td></tr>';
+        }
+        const stat = (plan, label, k) => {
+            const p = plan.p, row = plan.run.scheduleRows.find(r => r.age <= p.lifeExpectancy && r.actualNetTakeHome < ((r.targetSpend != null ? r.targetSpend : getAnnualNetNeed(p)) + (r.eventTotalThisYear || 0)) * 0.98);
+            return row ? '<div class="hh-status">⚠ ' + label + ': cannot fully fund spending from age ' + row.age + '</div>' : '<div class="hh-status">✓ ' + label + ': fully funded to age ' + p.lifeExpectancy + '</div>';
+        };
+        const lastA = rA[rA.length - 1] || {}, lastB = rB[rB.length - 1] || {};
+        const endTot = A.run.finalPortfolio / (real ? (lastA.inflationIndex || 1) : 1) + B.run.finalPortfolio / (real ? (lastB.inflationIndex || 1) : 1);
+        const byExp = HH.expShare != null;
+        document.getElementById('hhPanel').innerHTML =
+            '<h3 class="section-title">Household plan</h3>'
+            + '<div class="hh-cards"><div class="hh-card"><small>Household spending target</small><b>' + fmt(annual) + '</b><span>a year, in today\'s dollars</span></div>'
+            + '<div class="hh-card"><small>' + nm + '</small><b>' + Math.round(pct) + '%</b><span>of the spending</span></div>'
+            + '<div class="hh-card"><small>' + ns + '</small><b>' + (100 - Math.round(pct)) + '%</b><span>of the spending</span></div></div>'
+            + '<div class="hh-split"><label for="hhSplitIn">Your share of the spending (%)</label><input type="number" id="hhSplitIn" min="1" max="99" placeholder="Automatic" value="' + (HH.split || '') + '"' + (byExp ? ' disabled' : '') + '>'
+            + '<button type="button" class="secondary" onclick="hhSetSplit()"' + (byExp ? ' disabled' : '') + '>Update split</button>'
+            + '<span class="note-text">' + (byExp ? 'The split comes from who pays each expense in your expense list.' : 'Automatic: in proportion to each person\'s expected retirement income (government benefits, pensions and 4% of savings). If one of you runs short while the other has money left over, change the split.') + '</span></div>'
+            + stat(A, nm, 'me') + stat(B, ns, 'sp')
+            + '<div class="hh-status">' + nm + ': QPP at age ' + A.q + ', OAS at age ' + A.o + '</div><div class="hh-status">' + ns + ': QPP at age ' + B.q + ', OAS at age ' + B.o + '</div>'
+            + '<div class="hh-cards"><div class="hh-card"><small>Tax and OAS clawback over the plan</small><b>' + fmt(taxTot) + '</b><span>both of you</span></div>'
+            + '<div class="hh-card"><small>Savings left at the end</small><b>' + fmt(endTot) + '</b><span>both of you</span></div></div>'
+            + '<h3 class="section-title">Year by year, household view</h3>'
+            + '<div class="hh-tablewrap"><table class="hh-table"><thead><tr><th>Year</th><th>Ages</th><th>Spending need</th><th>Take-home</th><th>Tax</th><th><span>' + nm + '</span><br><small>takes out</small></th><th><span>' + ns + '</span><br><small>takes out</small></th><th>Savings left</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            + '<span class="note-text">Each of you has your own plan, run on your share of the household spending. Pension income splitting and spousal rollover are not modeled. Life events are paid from the account of whoever entered them. Tap the You or Your spouse tab above for a full plan for one person.</span>';
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    // Recommend the split of household spending that gives the best combined result (same scoring the optimizer uses).
+    function hhOptimizeSplit(total, freq) {
+        const rules = getTaxRules(), flat = p => (p.returnModel === 'montecarlo' ? Object.assign({}, p, { returnModel: 'flat', returnPost: p.mcAvgReturn }) : p);
+        const base = hhPlanProfiles({ total: total, freq: freq, pct: HH.shareAuto });
+        const A0 = flat(base.me), B0 = flat(base.sp), ca = hhChooseAges(A0, rules), cb = hhChooseAges(B0, rules);
+        const ev = pct => {
+            const a = Object.assign({}, A0, { spendAmount: Math.round(total * pct) / 100 }), b = Object.assign({}, B0, { spendAmount: Math.round(total * (100 - pct)) / 100 });
+            const ra = runSimulation(a, ca.q, ca.o, rules), rb = runSimulation(b, cb.q, cb.o, rules);
+            const sc = r => (r.depletionAge === null ? 1e6 : r.depletionAge * 1e4) + r.finalPortfolio - r.totalTaxesPaid * 0.2;
+            return { score: sc(ra) + sc(rb), tax: ra.totalTaxesPaid + ra.totalClawback + rb.totalTaxesPaid + rb.totalClawback };
+        };
+        let best = null;
+        for (let p = 5; p <= 95; p += 5) { const e = ev(p); if (!best || e.score > best.score) best = Object.assign({ pct: p }, e); }
+        for (let p = Math.max(1, best.pct - 4); p <= Math.min(99, best.pct + 4); p++) { const e = ev(p); if (e.score > best.score) best = Object.assign({ pct: p }, e); }
+        const auto = ev(HH.shareAuto);
+        return { pct: best.pct, tax: best.tax, taxAuto: auto.tax, better: best.score > auto.score + 1 };
+    }
+    function hhRecommendSplit() {
+        const out = document.getElementById('expRec');
+        const idx = expDraft.items.map((it, i) => ({ i: i, a: parseFloat(it.amount) || 0 })).filter(x => x.a > 0).sort((x, y) => y.a - x.a);
+        if (!idx.length) { out.textContent = 'Add at least one expense with an amount first.'; return; }
+        if (!HH.visited) { out.textContent = 'Fill in your spouse\'s details first (tap their name at the top of the page), then come back for a recommendation.'; return; }
+        const total = idx.reduce((s, x) => s + x.a, 0);
+        let r;
+        try { r = hhOptimizeSplit(total, expDraft.freq); } catch (e) { out.textContent = 'Could not work out a recommendation yet. Check both forms are filled in.'; return; }
+        let remain = total * r.pct / 100;
+        idx.forEach(x => { let pc; if (remain >= x.a - 0.005) { pc = 100; remain -= x.a; } else if (remain > 0) { pc = Math.round(remain / x.a * 100); remain = 0; } else pc = 0; expDraft.items[x.i].pct = pc; });
+        expRender();
+        const save = r.taxAuto - r.tax;
+        out.textContent = 'Recommended: your share is ' + r.pct + '% of these expenses.' + (r.better && save > 50 ? ' Estimated tax and clawback saved over the plan, compared with the automatic split: $' + Math.round(save).toLocaleString() + '.' : ' About the same tax as the automatic split.');
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function hhExpPctInput(it) {
+        if (!hhIsCouple()) return null;
+        const pc = document.createElement('input'); pc.type = 'number'; pc.className = 'ep'; pc.min = '0'; pc.max = '100'; pc.step = 'any'; pc.inputMode = 'decimal'; pc.placeholder = 'Auto';
+        pc.setAttribute('aria-label', 'Your %'); pc.value = (it.pct === null || it.pct === undefined) ? '' : it.pct;
+        pc.oninput = () => { it.pct = pc.value; expUpdateTotal(); };
+        return pc;
+    }
+
+    function hhChooseAges(p, taxRules) {
+        let chosenQppAge = p.qppStartAge;
+        let chosenOasAge = p.oasStartAge;
+        let optimizationMessage = "";
+
+        if (p.optimizerMode === 'auto') {
+            let bestScore = -Infinity, bestQpp = 65, bestOas = 65;
+            const useMc = p.returnModel === 'montecarlo';
+            const scoringTrials = 40;
+
+            const qLo = p.alreadyRetired ? Math.min(70, Math.max(60, p.currentAge)) : 60;
+            const oLo = p.alreadyRetired ? Math.min(70, Math.max(65, p.currentAge)) : 65;
+            for (let q = qLo; q <= 70; q++) {
+                for (let o = oLo; o <= 70; o++) {
+                    let score;
+                    if (useMc) {
+                        const mc = withRepeatableRandom(p.mcRepeatable, () => runMonteCarlo(p, q, o, taxRules, scoringTrials));
+                        score = mc.successRate * 1e9 + mc.p50Portfolio - mc.avgTotalTaxesPaid * 0.2;
+                    } else {
+                        let sim = runSimulation(p, q, o, taxRules);
+                        score = (sim.depletionAge === null ? 1000000 : sim.depletionAge * 10000) + sim.finalPortfolio - (sim.totalTaxesPaid * 0.2);
+                    }
+                    if (score > bestScore) { bestScore = score; bestQpp = q; bestOas = o; }
+                }
+            }
+            chosenQppAge = bestQpp;
+            chosenOasAge = bestOas;
+            optimizationMessage = `🤖 <strong>Optimizer Active:</strong> Evaluated all QPP (60–70) &amp; OAS (65–70) start-age permutations for you. Selected <strong>QPP at Age ${chosenQppAge}</strong> and <strong>OAS at Age ${chosenOasAge}</strong>` + (p.calcMode === 'couple' ? ` (your spouse's start ages are used as entered, not auto-optimized).` : `.`);
+        } else {
+            optimizationMessage = `⚙️ <strong>Manual Configuration Active:</strong> Using your manual QPP start age ${chosenQppAge} and OAS start age ${chosenOasAge}.`;
+        }
+
+        return { q: chosenQppAge, o: chosenOasAge, msg: optimizationMessage };
+    }
+
     // ---- Optional expense list: builds the spending target (spendAmount / spendFrequency) from a list ----
     // EXP.on = the list drives the two fields (greyed out). Saved with the profile as expenseOn / expenseFreq / expenseItems.
     var EXP = { on: false, freq: 'monthly', items: [] }, expDraft = null;
@@ -5448,7 +5736,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function expState() { if (!EXP || !Array.isArray(EXP.items)) EXP = { on: false, freq: 'monthly', items: [] }; return EXP; }
     function expTotal(items) { let t = 0; (items || []).forEach(i => { t += Math.max(0, parseFloat(i && i.amount) || 0); }); return Math.round(t * 100) / 100; }
     function expClean(items) {
-        return (Array.isArray(items) ? items : []).map(i => ({ name: String((i && i.name) || '').slice(0, 60), amount: Math.max(0, parseFloat(i && i.amount) || 0) }))
+        return (Array.isArray(items) ? items : []).map(i => ({ name: String((i && i.name) || '').slice(0, 60), amount: Math.max(0, parseFloat(i && i.amount) || 0), pct: (i && i.pct !== null && i.pct !== undefined && i.pct !== '' && isFinite(parseFloat(i.pct))) ? Math.min(100, Math.max(0, parseFloat(i.pct))) : null }))
             .filter(i => i.amount > 0).slice(0, 60);
     }
     function expMoney(n) { return '$' + n.toLocaleString('en-CA', { maximumFractionDigits: 2 }); }
@@ -5486,6 +5774,8 @@ The numbers in that example are placeholders from a prior year — replace every
             + '<span class="exp-note">Enter today\'s money. These costs are raised for inflation each year as the plan moves forward.</span>'
             + '<label for="expFreq">Are you entering monthly or weekly amounts?</label>'
             + '<select id="expFreq" onchange="expFreqChange()"><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select>'
+            + '<div id="expHhBox" hidden><span class="exp-note">Who pays: in the last box of each row, enter the % of that expense you pay (the rest is your spouse\'s). Leave it blank to use the automatic split.</span>'
+            + '<button type="button" class="secondary" onclick="hhRecommendSplit()">Recommend an optimized split</button><div class="exp-rec" id="expRec"></div></div>'
             + '<div id="expList"></div>'
             + '<button type="button" class="secondary" onclick="expAddRow()">+ Add an expense</button>'
             + '<div class="exp-tot"><span id="expTotLbl">Total per month</span><b id="expTotal">$0</b></div>'
@@ -5496,11 +5786,12 @@ The numbers in that example are placeholders from a prior year — replace every
         return sh;
     }
     function openExpenses() {
-        if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount })) }; }
+        if (!expDraft) { const s = expState(); expDraft = { freq: s.freq, items: s.items.map(i => ({ name: i.name, amount: i.amount, pct: (i.pct === null || i.pct === undefined) ? '' : i.pct })) }; }
         while (expDraft.items.length < 3) expDraft.items.push({ name: '', amount: '' });
         const sh = buildExpSheet();
         document.getElementById('expFreq').value = expDraft.freq;
         document.getElementById('expErr').hidden = true;
+        { const hb = document.getElementById('expHhBox'); if (hb) { hb.hidden = !hhIsCouple(); document.getElementById('expRec').textContent = ''; } }
         document.getElementById('expStopBtn').style.display = expState().on ? '' : 'none';
         expRender();
         sh.classList.add('open');
@@ -5521,7 +5812,7 @@ The numbers in that example are placeholders from a prior year — replace every
             a.oninput = () => { it.amount = a.value; expUpdateTotal(); };
             const x = document.createElement('button'); x.type = 'button'; x.className = 'secondary'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove');
             x.onclick = () => { expDraft.items.splice(idx, 1); expRender(); };
-            row.appendChild(n); row.appendChild(a); row.appendChild(x); list.appendChild(row);
+            row.appendChild(n); row.appendChild(a); const pcEl = hhExpPctInput(it); if (pcEl) row.appendChild(pcEl); row.appendChild(x); list.appendChild(row);
         });
         expUpdateTotal();
         if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
