@@ -6,6 +6,8 @@ Line numbers: `docs/code-map.md` (generated). The first ~25 lines of `index.html
 (functions, data flow, tax-rule location, edit rules). NEVER read index.html whole: use
 `grep -n name index.html` or Read with offset and limit.
 
+If something breaks (red check, wrong result, no access): `docs/if-something-breaks.md` (open it first).
+
 ## Rules (non-negotiable)
 - Privacy: `index.html` makes NO network calls (checks fail on `fetch`, `XMLHttpRequest`, `sendBeacon`,
   `WebSocket`). Sign-in and saved plans live ONLY in `account.js`, which encrypts every plan in the
