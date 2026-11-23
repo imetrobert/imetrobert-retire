@@ -133,3 +133,7 @@ Tax lines carry a tag from `whTag()` in `yearCardsHtml`: "(withheld)" when the b
 
 ## Saved scenarios are not changed by editing
 `saveProfileProgress()` (autosave on every calculation) never writes into a scenario that was saved on purpose: it keeps the edits as a draft in the current-profile key with `dirty = true` (compared with `planSig`) and leaves the saved copy, its name and its results alone. The results status line then says the changes are not saved; only "Save on this device" (overwrite or save as new) changes the saved scenario. The "new scenario" name box starts with the name typed in the name box.
+
+## Results button bar (three buttons)
+
+The bar under the results (Edit inputs, Save on this device, Save on device and cloud) has class `step-nav-3`. It wraps and scrolls with the page instead of sticking, so three buttons never run off a phone screen. The other steps keep the sticky one-row `step-nav` bar (max two buttons). If you add a fourth button here, check it at 390px wide in English and French.

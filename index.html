@@ -243,6 +243,11 @@ EDIT SAFELY: change wording in the HTML only for labels; do not rename element i
         }
         .step-nav > button { flex: 1 1 0; white-space: nowrap; }
         .step-nav > button:not(.secondary) { flex: 2 1 0; }
+        /* Results bar has three buttons: let it wrap and scroll with the page so nothing runs off a phone screen */
+        .step-nav.step-nav-3 { position: static; flex-wrap: wrap; align-items: stretch; }
+        .step-nav.step-nav-3 > button { white-space: normal; line-height: 1.25; min-width: 0; }
+        .step-nav.step-nav-3 > button.secondary { flex: 1 1 100%; }
+        .step-nav.step-nav-3 > button:not(.secondary) { flex: 1 1 calc(50% - 0.3rem); }
         .results-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 
         /* ---------- Save toast ---------- */
@@ -1044,7 +1049,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             </div>
             <span class="note-text">Every calculation auto-saves your inputs as a draft. To keep this plan <em>and its results</em> under a name, tap <strong>💾 Save on this device</strong> — it is then listed as saved by you under "Manage Saved Profiles".</span>
 
-            <div class="btn-group step-nav">
+            <div class="btn-group step-nav step-nav-3">
                 <button type="button" class="secondary" onclick="editProfile()">← Edit inputs</button>
                 <button type="button" class="save-btn" onclick="saveProfileAndResults()">💾 Save on this device</button>
                 <button type="button" class="save-btn" onclick="saveToBoth()">☁ Save on device and cloud</button>
