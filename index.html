@@ -2169,7 +2169,7 @@ The numbers in that example are placeholders from a prior year — replace every
 
     function populateTaxRulesForm() {
         const r = getTaxRules();
-        document.getElementById('rulesVerifiedDateLabel').innerText = r.verifiedDate;
+        const vdl = document.getElementById('rulesVerifiedDateLabel'); if (vdl) vdl.innerText = r.verifiedDate;
         document.getElementById('updatePromptText').value = buildUpdatePrompt();
         document.getElementById('ruleFedBpaFull').value = r.fedBpaFull;
         document.getElementById('ruleFedBpaReduced').value = r.fedBpaReduced;
@@ -6436,7 +6436,7 @@ The numbers in that example are placeholders from a prior year — replace every
         // Wordy blue/green banners become one-line expandable tips.
         document.querySelectorAll('.question-step .verify-banner').forEach(b => {
             if (b.dataset.tip) return; b.dataset.tip = '1';
-            const st = b.querySelector('strong');
+            const st = b.querySelector('strong:not([id])');
             const head = st ? st.textContent.trim().replace(/\.$/, '') : 'Good to know';
             if (st) st.remove();
             const d = document.createElement('details'); d.className = 'tipbox';
