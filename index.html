@@ -448,6 +448,7 @@ details.tipbox>div{padding:0 12px 12px;font-size:14px;color:#1e293b}
 .preset-row{display:flex;gap:6px;margin:6px 0 6px}
 .preset-row button{flex:1;padding:10px 4px;font-size:.78rem;line-height:1.25}
 .preset-row button.active{background:#1e3a8a;color:#fff;border-color:#1e3a8a}
+.yp-age small.yp-yr{margin:0 0 3px;color:#1e3a8a;font-weight:700}
 .yp-age small{display:block;font-size:10px;font-weight:600;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
 .yp-main{flex:1;min-width:0}
 .yp-main b{display:block;font-size:17px;color:#0f172a}
@@ -5447,7 +5448,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const whLines = accLines(k => WH[k] || 0);
             const whOf = lbl => { const m = whLines.find(x => x[0] === lbl); return m ? m[1] : 0; };
             const taxAcc = accLines(k => pu[k] ? pu[k].tax : 0);
-            let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.', null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
+            let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.' + (x[1] - whOf(x[0]) > 0.5 ? ' The other ' + fmtNum(x[1] - whOf(x[0])) + ' of this tax is not withheld. It comes from the money you receive in pocket, so set it aside.' : ''), null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
             if (has(taxPen)) s2 += R('From QPP / OAS / pension', taxPen);
             if (has(r.clawback)) s2 += R('Includes OAS paid back (clawback)', r.clawback, true);
             if (has(r.withholdingTax)) {
@@ -5590,7 +5591,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const headline = deficit ? 'Short: only ' + perMo + '/mo' : 'Take out ' + fmtCompact(withdrawn);
             const sub = deficit ? 'Target not fully met' : 'To spend ' + perMo + '/mo' + (has(taxBill) ? ' · tax ' + fmtCompact(taxBill) : '') + (moveTot > 1 ? ' · move ' + fmtCompact(moveTot) : '');
             return '<details class="yp' + (deficit ? ' deficit' : '') + '"><summary>' +
-                '<span class="yp-age">' + r.age + '<small>age</small><em class="yp-rate ' + (r.rate > 0.00005 ? 'up' : r.rate < -0.00005 ? 'down' : '') + '">' + (r.rate > 0 ? '+' : '') + (r.rate * 100).toFixed(1) + '%</em><small>growth</small></span>' +
+                '<span class="yp-age">' + ((p && p.currentAge > 0) ? '<small class="yp-yr">' + (new Date().getFullYear() + Math.round(r.age - p.currentAge)) + '</small>' : '') + r.age + '<small>age</small><em class="yp-rate ' + (r.rate > 0.00005 ? 'up' : r.rate < -0.00005 ? 'down' : '') + '">' + (r.rate > 0 ? '+' : '') + (r.rate * 100).toFixed(1) + '%</em><small>growth</small></span>' +
                 '<span class="yp-main"><b>' + headline + '</b><small>' + sub + '</small></span>' +
                 '<span class="yp-chev">›</span></summary><div class="yp-body">' + body + '</div></details>';
         }).join('');
