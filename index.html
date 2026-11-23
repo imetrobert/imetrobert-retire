@@ -6433,10 +6433,17 @@ The numbers in that example are placeholders from a prior year — replace every
                 if (prev.tagName === 'LABEL') { title = prev.textContent.trim().replace(/[:?]+$/, ''); break; }
             }
             if (title === 'More info') { const h = n.closest('.asset-row') && n.closest('.asset-row').querySelector('h4 .ch-title, h4'); if (h) title = h.textContent.trim(); }
+            // Two notes in a row share one button: the second is added to the first one's pop-up.
+            const prevBtn = n.previousElementSibling;
+            if (prevBtn && prevBtn.classList.contains('info-btn') && prevBtn._holder) {
+                prevBtn._holder.insertAdjacentHTML('beforeend', '<p>' + n.innerHTML + '</p>');
+                n.dataset.info = '1'; n.remove(); return;
+            }
             const holder = document.createElement('div');
             holder.innerHTML = '<p>' + n.innerHTML + '</p>';
             const btn = document.createElement('button');
             btn.type = 'button'; btn.className = 'info-btn';
+            btn._holder = holder;
             btn.innerHTML = '<i class="info-i">i</i> Why this matters';
             btn.addEventListener('click', () => showInfo(title, holder.innerHTML));
             n.dataset.info = '1';

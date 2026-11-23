@@ -145,3 +145,7 @@ In Step 3 (Monte Carlo), choosing "My portfolio's own history" in `mcVolSource` 
 ## Year view: "Income that arrives on its own"
 
 The green block lists only the sources that pay that year, one line each ("From QPP", "From OAS", "From your spouse's public-sector pension"), built in `yearCardsHtml` from `r.qppInc`, `r.oasIncGross` and `r.pensionInc`. `pensionInc` is NOT the Bell/federal locked-in pension (that has its own account block); it is the spouse's public-sector pension (RREGOP).
+
+## One "Why this matters" button per run of notes
+
+In `initInfoNotes()`, long `.note-text` blocks become a "Why this matters" button. When two such notes follow each other, the second is added to the first one's pop-up instead of getting its own button (`btn._holder`).
