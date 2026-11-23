@@ -566,7 +566,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
         <div class="question-step" data-step="2">
             <div class="step-head"><div class="eyebrow">Step 2 of 3</div><h2>Your money</h2><p>Spending goal, accounts and pensions. Tap a card to open it. Amounts marked “example” are placeholders: replace them with yours, or set them to 0.</p></div>
             <div class="expand-all"><button type="button" class="link-btn" onclick="setAllCards(true)">Expand all</button><button type="button" class="link-btn" onclick="setAllCards(false)">Collapse all</button></div>
-            <label for="spendFrequency">How often do you want paid?</label>
+            <label for="spendFrequency">How often do you want to be paid?</label>
             <select id="spendFrequency" onchange="updateSpendFrequencyLabel()">
                 <option value="monthly">Monthly</option>
                 <option value="weekly">Weekly</option>
@@ -5260,6 +5260,7 @@ The numbers in that example are placeholders from a prior year — replace every
             return nums.length ? 'Not used' : '';
         }
         let s = fmtInputMoney(first.id, first.value);
+        if (s.charAt(0) !== '$') return first.id === 'inflationPct' ? s + '%' : '';
         const second = nums.find(i => i !== first && /^contrib/i.test(i.id) && parseFloat(i.value) > 0);
         if (second) s += ' · +' + fmtInputMoney('Amount', second.value) + '/yr';
         else if (nums.some(i => /^contrib/i.test(i.id))) s += ' · not adding';
