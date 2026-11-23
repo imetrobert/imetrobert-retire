@@ -123,3 +123,6 @@ Step 1 asks "Are you filling this out for you, or for you and a spouse?". Choosi
 - Step 2 cards: `ACCT_HELP` (one sentence under each account name, matched on the card title) and `cardSummary()` (collapsed line: balance, "· not adding", "· example" until the person edits the field; `markAllTouched()` runs after a plan is loaded).
 - Step 3 return presets: `applyReturnPreset(pre, post)` and the three buttons in `#retPresets` (Cautious 4/3, Balanced 6/4.5, Optimistic 7.5/5.5); `updateReturnPresets()` highlights the matching one.
 - English only: no French entries needed.
+
+## Year view: withholding counts as tax first
+In `yearCardsHtml`, the local `pu` (copy of `r.purposes`) is rebalanced before any section is built: each account's withheld amount (`r.whtRrsp`, `whtRlif`, `whtLira`, `whtFtq`) is moved into that account's `tax` purpose, and the same amount of tax is moved to the other accounts' spending, event or transfer lines. Per-purpose totals do not change; `r.purposes` itself is untouched. Result: "Spending" shows what you actually receive, and "Taxes" shows the withholding per account. The old "Total held back at source" block is gone; only an over-withholding note remains (`withholdingTax - taxBill`). Year cards also show the calendar year (today's year plus age minus age today).
