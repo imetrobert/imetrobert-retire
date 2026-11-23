@@ -2551,8 +2551,24 @@ The numbers in that example are placeholders from a prior year — replace every
         localStorage.removeItem('csl_retire_profile_v2026');
     };
 
+    // The one-time unlock cannot come before retirement: keep the field at or above the retirement age.
+    function syncUnlockMin(fromChange) {
+        const u = document.getElementById('rlifUnlockAge'); if (!u) return;
+        const ar = document.getElementById('alreadyRetired');
+        const ra = (ar && ar.checked) ? parseFloat(document.getElementById('currentAge').value) : parseFloat(document.getElementById('targetAge').value);
+        const min = Math.max(55, ra || 0);
+        u.min = min;
+        let note = document.getElementById('rlifUnlockMinNote');
+        if (!note) { note = document.createElement('span'); note.id = 'rlifUnlockMinNote'; note.className = 'note-text'; u.insertAdjacentElement('afterend', note); }
+        const v = parseFloat(u.value);
+        if (v < min) { u.value = min; note.textContent = 'Moved up to ' + min + ': unlocking cannot happen before you retire.'; }
+        else if (fromChange !== true) { note.textContent = ''; }
+        else note.textContent = '';
+    }
+    ['rlifUnlockAge', 'targetAge', 'currentAge', 'alreadyRetired'].forEach(id => document.addEventListener('change', e => { if (e.target && e.target.id === id) syncUnlockMin(true); }));
+    document.addEventListener('DOMContentLoaded', () => setTimeout(syncUnlockMin, 0));
     function populateFormRaw(p) {
-        setTimeout(markAllTouched, 0);
+        setTimeout(markAllTouched, 0); setTimeout(syncUnlockMin, 0);
         document.getElementById('profileName').value = p.name || '';
         document.getElementById('calcMode').value = p.calcMode || 'single';
         document.getElementById('currentAge').value = p.currentAge ?? 55;
@@ -3115,7 +3131,7 @@ The numbers in that example are placeholders from a prior year — replace every
             lifMaxPct: parseFloat(document.getElementById('lifMaxPct').value) || 0,
             rlifUnlockEnabled: document.getElementById('rlifUnlockEnabled').checked && (document.getElementById('liraJurisdiction').value === 'federal' || (parseFloat(document.getElementById('bellDcBalance').value) || 0) > 0),
             rlifUnlockAgeEntered: parseFloat(document.getElementById('rlifUnlockAge').value) || 65,
-            rlifUnlockAge: Math.max(55, parseFloat(document.getElementById('rlifUnlockAge').value) || 65),
+            rlifUnlockAge: Math.max(55, parseFloat(document.getElementById('rlifUnlockAge').value) || 65, document.getElementById('alreadyRetired').checked ? (parseFloat(document.getElementById('currentAge').value) || 0) : (parseFloat(document.getElementById('targetAge').value) || 0)),
             rlifUnlockPct: Math.min(50, Math.max(0, parseFloat(document.getElementById('rlifUnlockPct').value) || 0)),
             ftqBalance: parseFloat(document.getElementById('ftqBalance').value) || 0,
             contribFtq: parseFloat(document.getElementById('contribFtq').value) || 0,
@@ -4740,6 +4756,9 @@ The numbers in that example are placeholders from a prior year — replace every
         summaryHtml += summaryLongevityHtml;
         if (p.rlifUnlockEnabled && p.rlifUnlockAgeEntered && p.rlifUnlockAgeEntered < 55) {
             summaryHtml += `<p>⚠️ <span class="alert-highlight">Unlock age adjusted:</span> you entered ${p.rlifUnlockAgeEntered}, but the federal one-time 50% unlock is only available from age 55, so the model unlocked at 55.</p>`;
+        }
+        if (p.rlifUnlockEnabled && p.rlifUnlockAgeEntered >= 55 && p.rlifUnlockAgeEntered < p.rlifUnlockAge) {
+            summaryHtml += `<p>⚠️ <span class="alert-highlight">Unlock age adjusted:</span> you entered ${p.rlifUnlockAgeEntered}, but unlocking cannot happen before you retire (age ${p.rlifUnlockAge}), so the model unlocks at ${p.rlifUnlockAge}.</p>`;
         }
         const overWithheld = finalRun.scheduleRows.filter(r => r.age <= p.lifeExpectancy && (r.withholdingTax - r.taxPaid) > 500);
         if (overWithheld.length) {
