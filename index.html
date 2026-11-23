@@ -5409,7 +5409,31 @@ The numbers in that example are placeholders from a prior year — replace every
             const ulPct = Math.round(p.rlifUnlockPct || 50);
             const unlockTxt = 'Unlocking ' + ulPct + '% of your locked-in money into a new unlocked RRSP / RRIF';
             // Step 1: what to take out, and what each piece is for.
-            const pu = r.purposes || {};
+            // Withholding counts as tax first: each account's withheld amount is the tax paid from that account,
+            // so what is left of its withdrawal is the money you actually receive (spending, events, moves).
+            // Totals per purpose stay the same; only which account pays what changes.
+            const pu = (function (src) {
+                const out = {};
+                ACC.forEach(a => { const o = src[a[0]]; out[a[0]] = o ? Object.assign({}, o) : null; });
+                const WHT = { rrsp: r.whtRrsp, rlif: r.whtRlif, lira: r.whtLira, ftq: r.whtFtq };
+                const keys = ACC.map(a => a[0]).filter(k => out[k]);
+                keys.forEach(k => {
+                    let need = (WHT[k] || 0) - (out[k].tax || 0);
+                    if (need <= 0.5) return;
+                    ['income', 'event', 'transfer'].forEach(pp => {
+                        keys.forEach(j => {
+                            if (j === k || need <= 0.005) return;
+                            const spare = (out[j].tax || 0) - (WHT[j] || 0);
+                            const x = Math.min(need, spare, out[k][pp] || 0);
+                            if (!(x > 0.005)) return;
+                            out[k][pp] -= x; out[k].tax = (out[k].tax || 0) + x;
+                            out[j][pp] = (out[j][pp] || 0) + x; out[j].tax -= x;
+                            need -= x;
+                        });
+                    });
+                });
+                return out;
+            })(r.purposes || {});
             const SPLD = 'bellDraw', SPLB = 'simBellBal';
             const accLines = fn => {
                 const out = [];
