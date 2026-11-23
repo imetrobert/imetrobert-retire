@@ -5566,7 +5566,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const pensCover = genPen + (has(evt) ? Math.max(0, evt - sumP('event')) : 0);
             if (has(pens)) {
                 acctHtml += '<div class="yp-acct pen"><div class="yp-ah"><span>Income that arrives on its own</span><b>' + fmtNum(pens) + '</b></div>' +
-                    '<div class="yp-al">QPP, OAS and employer pension' + '</div>' +
+                    [[r.qppInc, 'QPP'], [r.oasIncGross, 'OAS'], [r.pensionInc, "your spouse's public-sector pension"]].filter(x => has(x[0])).map(x => '<div class="yp-al">From ' + x[1] + ' <b>' + fmtNum(x[0]) + '</b></div>').join('') +
                     (has(pensCover) ? '<div class="yp-al">Goes to spending <b>' + fmtNum(pensCover) + '</b></div>' : '') +
                     (has(taxPen) ? '<div class="yp-al">Goes to tax <b>' + fmtNum(taxPen) + '</b></div>' : '') +
                     (has(penMove) ? '<div class="yp-al">Moved or reinvested <b>' + fmtNum(penMove) + '</b></div>' : '') + '</div>';
