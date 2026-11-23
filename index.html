@@ -5471,8 +5471,10 @@ The numbers in that example are placeholders from a prior year — replace every
             const WH = { rrsp: r.whtRrsp, rlif: r.whtRlif, lira: r.whtLira, ftq: r.whtFtq };
             const whLines = accLines(k => WH[k] || 0);
             const whOf = lbl => { const m = whLines.find(x => x[0] === lbl); return m ? m[1] : 0; };
+            // Tells the reader whether tax money is taken by the bank before they see it, or is theirs to set aside.
+            const whTag = (w, amt) => (w > 0.5 && w >= amt - 0.5) ? ' (withheld)' : (w > 0.5 ? ' (partly withheld)' : ' (set aside, do not spend)');
             const taxAcc = accLines(k => pu[k] ? pu[k].tax : 0);
-            let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.' + (x[1] - whOf(x[0]) > 0.5 ? ' The other ' + fmtNum(x[1] - whOf(x[0])) + ' of this tax is not withheld. It comes from the money you receive in pocket, so set it aside.' : ''), null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
+            let s2 = taxAcc.map(x => R('From ' + x[0] + whTag(whOf(x[0]), x[1]), x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.' + (x[1] - whOf(x[0]) > 0.5 ? ' The other ' + fmtNum(x[1] - whOf(x[0])) + ' of this tax is not withheld. It comes from the money you receive in pocket, so set it aside.' : ''), null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
             if (has(taxPen)) s2 += R('From QPP / OAS / pension', taxPen);
             if (has(r.clawback)) s2 += R('Includes OAS paid back (clawback)', r.clawback, true);
             if (has(r.withholdingTax) && r.withholdingTax - taxBill > 0.5) {
@@ -5551,7 +5553,7 @@ The numbers in that example are placeholders from a prior year — replace every
                         }
                     });
                 }
-                if (has(x.tax)) acctHtml += '<div class="yp-al">Goes to tax <b>' + fmtNum(x.tax) + '</b></div>';
+                if (has(x.tax)) acctHtml += '<div class="yp-al">Goes to tax' + whTag(whOf(lbl), x.tax) + ' <b>' + fmtNum(x.tax) + '</b></div>';
                 if (has(x.wd)) { const w = whOf(lbl); if (has(w)) acctHtml += '<div class="yp-al wht">The bank withholds ' + fmtNum(w) + ', which will automatically be used to pay part of your tax owed for the year. So you will receive ' + fmtNum(Math.max(0, x.wd - w)) + ' in pocket.' + (() => { const rest = Math.max(0, x.wd - w), need = Math.max(0, (x.tax || 0) - w); if (!has(need)) return ''; return need >= rest - 0.5 ? ' All of it is needed to pay the rest of your yearly tax bill, so set it aside.' : ' Of that, ' + fmtNum(need) + ' is needed to pay the rest of your yearly tax bill, so set it aside.'; })() + '</div>'; else if (has(x.tax)) acctHtml += '<div class="yp-al wht">There is no withholding tax, so put this money aside: it is needed to pay your tax bill.</div>'; }
                 if (has(x.tr)) {
                     if (trDen > 0 && dest.length) dest.forEach(d => { const v = x.tr * d[1] / trDen; if (has(v)) acctHtml += '<div class="yp-xfer out"><span>➜ Moved into ' + d[0] + '<small> part of this withdrawal</small></span><b>' + fmtNum(v) + '</b></div>'; });
