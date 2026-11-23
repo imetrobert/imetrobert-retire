@@ -137,3 +137,7 @@ Tax lines carry a tag from `whTag()` in `yearCardsHtml`: "(withheld)" when the b
 ## Results button bar (three buttons)
 
 The bar under the results (Edit inputs, Save on this device, Save on device and cloud) has class `step-nav-3`. It wraps and scrolls with the page instead of sticking, so three buttons never run off a phone screen. The other steps keep the sticky one-row `step-nav` bar (max two buttons). If you add a fourth button here, check it at 390px wide in English and French.
+
+## Volatility box hidden when the portfolio sets it
+
+In Step 3 (Monte Carlo), choosing "My portfolio's own history" in `mcVolSource` hides the `mcVolatility` box, its label (`mcVolLabel`) and hint (`mcVolHint`); the measured figure is shown in the blue panel (`mcPortfolioStatus`). The hidden box still holds the value. Code: `applyMcVolSource()`.
