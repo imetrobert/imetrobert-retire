@@ -347,7 +347,7 @@
         sum.textContent = t('sum');
         var keepFile = document.getElementById('stmtFile');
         var h = '<p style="margin:0 0 0.5rem;font-size:0.85rem;color:var(--medium-gray)">' + esc(t('intro')) + '</p>' +
-            '<label for="stmtFile" style="font-weight:600">' + esc(t('file')) + '</label>' +
+            '<label for="stmtFile" class="secondary" style="display:inline-block;font-weight:600;padding:0.55rem 0.9rem;border:1px solid #94a3b8;border-radius:8px;cursor:pointer">' + esc(t('file')) + '</label>' +
             '<div id="stmtFileSlot"></div>' +
             '<div id="stmtOut" aria-live="polite"></div>' +
             '<p style="margin:0.6rem 0 0;font-size:0.76rem">' + esc(t('privacy')) + '</p>';
@@ -357,6 +357,7 @@
         else {
             var inp = document.createElement('input');
             inp.type = 'file'; inp.id = 'stmtFile'; inp.accept = '.pdf,application/pdf';
+            inp.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;overflow:hidden';
             inp.addEventListener('change', onFile);
             slot.appendChild(inp);
         }
@@ -536,6 +537,7 @@
         render();
         var lb = document.getElementById('langBtn');
         if (lb) lb.addEventListener('click', function () { setTimeout(render, 30); });
+        document.addEventListener('qcrp-lang', function () { setTimeout(render, 0); });
         var cm = document.getElementById('calcMode');
         if (cm) cm.addEventListener('change', function () { renderResult(); });
     }
