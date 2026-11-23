@@ -130,3 +130,6 @@ Tax lines carry a tag from `whTag()` in `yearCardsHtml`: "(withheld)" when the b
 
 ## One-time unlock never before retirement
 `syncUnlockMin()` keeps `#rlifUnlockAge` at or above the retirement age (the age today if already retired) and at least 55; getProfileData applies the same floor to `p.rlifUnlockAge`, and the results show an "Unlock age adjusted" note when it moved the age.
+
+## Saved scenarios are not changed by editing
+`saveProfileProgress()` (autosave on every calculation) never writes into a scenario that was saved on purpose: it keeps the edits as a draft in the current-profile key with `dirty = true` (compared with `planSig`) and leaves the saved copy, its name and its results alone. The results status line then says the changes are not saved; only "Save on this device" (overwrite or save as new) changes the saved scenario. The "new scenario" name box starts with the name typed in the name box.

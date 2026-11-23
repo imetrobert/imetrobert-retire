@@ -3200,6 +3200,14 @@ The numbers in that example are placeholders from a prior year — replace every
         // the user saved on purpose back to a "draft".
         const prev = allProfiles[profile.id];
         if (prev && prev.savedExplicitly) { profile.savedExplicitly = true; profile.explicitSavedMs = prev.explicitSavedMs; }
+        // A scenario saved on purpose changes only when you save it again: a calculation keeps the edits as a draft
+        // (so a reload does not lose them) but leaves the saved copy, its name and its results as they were.
+        if (prev && prev.savedExplicitly) {
+            profile.dirty = planSig(profile) !== planSig(prev);
+            localStorage.setItem('csl_retire_profile_v2026', JSON.stringify(profile));
+            showSaveBadge("Draft auto-saved");
+            return;
+        }
         localStorage.setItem('csl_retire_profile_v2026', JSON.stringify(profile));
         allProfiles[profile.id] = profile;
         localStorage.setItem('csl_all_profiles_v2026', JSON.stringify(allProfiles));
@@ -3248,7 +3256,7 @@ The numbers in that example are placeholders from a prior year — replace every
         if (window.awrResetPlan) window.awrResetPlan();
     };
     // Inline dialog (window.confirm is unreliable on iPhone). cb(mode, newName): mode is 'overwrite', 'new' or null (cancel).
-    window.askSaveChoice = function (label, cb) {
+    window.askSaveChoice = function (label, cb, defName) {
         const old = document.getElementById('saveChoice'); if (old) old.remove();
         const ov = document.createElement('div');
         ov.id = 'saveChoice';
@@ -3263,7 +3271,7 @@ The numbers in that example are placeholders from a prior year — replace every
         card.appendChild(b1);
         card.appendChild(mk('p', 'Replaces the saved copy with what is on screen.', 'margin:4px 0 14px;font-size:13px;color:#64748b;'));
         card.appendChild(mk('p', 'Name for the new scenario', 'margin:0 0 4px;font-weight:600;'));
-        const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.maxLength = 60; nameIn.value = label + ' (copy)'; nameIn.style.cssText = 'width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;';
+        const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.maxLength = 60; nameIn.value = defName || (label + ' (copy)'); nameIn.style.cssText = 'width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;';
         card.appendChild(nameIn);
         const b2 = mk('button', 'Save as a new scenario', 'width:100%;margin:0 0 8px;'); b2.type = 'button'; b2.className = 'save-btn'; b2.onclick = () => close('new');
         card.appendChild(b2);
@@ -3274,7 +3282,8 @@ The numbers in that example are placeholders from a prior year — replace every
     function saveWithChoice(done) {
         const lbl = savedScenarioLabel();
         if (lbl === null) { done(); return; }
-        window.askSaveChoice(lbl, (mode, nm) => { if (!mode) return; if (mode === 'new') window.saveDetach(nm); done(); });
+        const typed = (document.getElementById('profileName').value || '').trim();
+        window.askSaveChoice(lbl, (mode, nm) => { if (!mode) return; if (mode === 'new') window.saveDetach(nm); done(); }, typed && typed !== lbl ? typed : '');
     }
     function saveProfileAndResults() { saveWithChoice(saveProfileAndResultsNow); }
     function saveProfileAndResultsNow() {
@@ -3315,7 +3324,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 cur.results = r;
                 localStorage.setItem('csl_retire_profile_v2026', JSON.stringify(cur));
                 const all = getAllProfiles();
-                if (all[cur.id]) { all[cur.id].results = r; putAllProfiles(all); }
+                if (all[cur.id] && !cur.dirty) { all[cur.id].results = r; putAllProfiles(all); }
             }
         } catch (e) { /* the status line below still tells the truth about what is stored */ }
         updateSaveStatus();
@@ -3330,6 +3339,11 @@ The numbers in that example are placeholders from a prior year — replace every
         try { cur = JSON.parse(localStorage.getItem('csl_retire_profile_v2026') || 'null'); } catch (e) { /* treated as not saved */ }
         if (!cur) { el.style.color = '#64748b'; el.textContent = 'Not saved yet.'; return; }
         const label = cur.name ? '“' + cur.name + '”' : 'this scenario';
+        if (cur.savedExplicitly && cur.dirty) {
+            el.style.color = '#a16207';
+            el.textContent = 'You changed “' + (((getAllProfiles()[cur.id] || {}).name) || cur.name || 'this scenario') + '” but have not saved the changes. Tap "Save on this device" to keep them (you can overwrite it or save a new scenario).';
+            return;
+        }
         if (cur.savedExplicitly) {
             el.style.color = '#166534';
             el.textContent = '✓ Saved by you: ' + label + ' — ' + new Date(cur.explicitSavedMs || Date.now()).toLocaleString() +
@@ -3372,7 +3386,7 @@ The numbers in that example are placeholders from a prior year — replace every
     const SYNC_KEY = 'csl_all_profiles_v2026_cloudsync';
     function planSig(p) {
         const c = Object.assign({}, p);
-        ['timestamp', 'timestampMs', 'explicitSavedMs', 'savedExplicitly', 'results', 'savedStep'].forEach(k => delete c[k]);
+        ['timestamp', 'timestampMs', 'explicitSavedMs', 'savedExplicitly', 'results', 'savedStep', 'dirty'].forEach(k => delete c[k]);
         const norm = v => Array.isArray(v) ? v.map(norm) : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = norm(v[k]), o), {}) : v;
         const str = JSON.stringify(norm(c));
         let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
