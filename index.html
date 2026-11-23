@@ -5475,9 +5475,8 @@ The numbers in that example are placeholders from a prior year — replace every
             let s2 = taxAcc.map(x => R('From ' + x[0], x[1]) + (/Non-registered/.test(x[0]) ? R('There is no withholding tax, so put this money aside: it is needed to pay your tax bill.', null, true) : (has(whOf(x[0])) ? R('The bank withholds ' + fmtNum(whOf(x[0])) + ' on this withdrawal. It will automatically be used to pay part of your tax owed for the year.' + (x[1] - whOf(x[0]) > 0.5 ? ' The other ' + fmtNum(x[1] - whOf(x[0])) + ' of this tax is not withheld. It comes from the money you receive in pocket, so set it aside.' : ''), null, true) : R('There is no withholding tax on this part (the yearly minimum), so put it aside: it is needed to pay your tax bill.', null, true)))).join('');
             if (has(taxPen)) s2 += R('From QPP / OAS / pension', taxPen);
             if (has(r.clawback)) s2 += R('Includes OAS paid back (clawback)', r.clawback, true);
-            if (has(r.withholdingTax)) {
-                s2 += '<div class="yp-row yp-whtot"><span>Total held back at source</span><b>' + fmtNum(r.withholdingTax) + '</b></div>' +
-                    R('Only from ' + whLines.filter(x => x[1] > 0.5).map(x => x[0] + ' ' + fmtNum(x[1])).join(', ') + '. It counts toward the tax above when you file.', null, true);
+            if (has(r.withholdingTax) && r.withholdingTax - taxBill > 0.5) {
+                s2 += R('The bank withholds ' + fmtNum(r.withholdingTax - taxBill) + ' more than this year\'s tax. The difference comes back when you file.', null, true);
             }
             // 3) Moved or reinvested
             const dest = [['TFSA', toTfsa], ['Non-registered savings', toNon]].filter(d => has(d[1]));
