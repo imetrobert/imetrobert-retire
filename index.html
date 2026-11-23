@@ -5360,8 +5360,8 @@ The numbers in that example are placeholders from a prior year — replace every
             h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
             setCardCollapsed(card, true);
         });
-        // Cards the person is most likely to edit first stay open.
-        ['currentRrsp', 'spendAmount'].forEach(id => {
+        // Only the spending card stays open; every account card starts collapsed.
+        ['spendAmount'].forEach(id => {
             const el = document.getElementById(id);
             const c = el && el.closest('.asset-row.collapsible');
             if (c) setCardCollapsed(c, false);
