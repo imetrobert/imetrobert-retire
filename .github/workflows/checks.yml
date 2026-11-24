@@ -27,6 +27,7 @@ jobs:
           python3 scripts/test_account.py
           python3 scripts/test_tax.py
           python3 scripts/test_expenses.py
+          python3 scripts/test_other_income.py
           python3 scripts/test_household.py
           python3 scripts/test_statements.py
       - name: Refresh the code map

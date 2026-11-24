@@ -29,6 +29,7 @@ If something breaks (red check, wrong result, no access): `docs/if-something-bre
 - Pension income splitting (household mode, on by default): `hhSplitPensions` moves up to 50% of the higher earner's eligible pension income each year via `p.hhTaxAdj`; recipe in `docs/common-edits.md` (recipe 14).
 - Spousal rollover (household mode, on by default): `hhRollover` passes the first-dying spouse's savings to the survivor tax-free (`p.hhSurv`, `p.hhRollover`); recipe 14 in `docs/common-edits.md`.
 - Expense list: optional list on Step 2 that fills and locks the spending fields (common-edits recipe on the expense list). Test: `python3 scripts/test_expenses.py`.
+- Other income in retirement (optional): a Step 1 Yes/No question shows a Step 2 card with one yearly amount or a year-by-year list built from the ages (recipe 15 in `docs/common-edits.md`). It is taxable income in `runSimulation` (`otherIncY`, row field `otherInc`), per person. Test: `python3 scripts/test_other_income.py` (and the "other income" part of `scripts/test_tax.py`).
 - Tax check: `python3 scripts/test_tax.py` compares the tax engine and yearly plan with an independent calculation (own copy of the 2026 numbers at the top of the script). Update that copy whenever the tax numbers change (common-edits recipe on the tax check).
 - Test the gate: `python3 scripts/test_account.py` (stubbed server, needs `pip install playwright`). CI runs it.
 - Saved plans table: `migration/planner_profiles.sql` (run once via the Supabase AI prompt in the README).
