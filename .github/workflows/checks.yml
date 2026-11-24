@@ -39,5 +39,6 @@ jobs:
             git config user.email "actions@users.noreply.github.com"
             git add docs/code-map.md
             git commit -m "Refresh code map"
+            git pull --rebase -q || true
             git push
           fi
