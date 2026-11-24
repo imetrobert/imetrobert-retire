@@ -121,6 +121,31 @@ with sync_playwright() as pw:
             if abs(r['resid']) > 1: fails.append('split plan: age %d, scenario %d: money in minus money out is $%.2f' % (r['age'], i, r['resid']))
             if abs(r['dtax']) > 5: fails.append('split plan: age %d, scenario %d: tax with income moved ($%s) differs from calculateTax by $%.2f' % (r['age'], i, r['adj'], r['dtax']))
     print('pension splitting: %d rows checked' % split_rows)
+    # other income in retirement (work, rental, business): taxed as ordinary income; one yearly amount or a year-by-year list;
+    # today's dollars (raised by the inflation index) or the dollars of each year; switched off when the declaration is "No"
+    random.seed(21); oi_rows = 0
+    for i in range(12):
+        flat = random.choice([0, 8000, 20000]); basis = random.choice(['today', 'year']); infl = random.choice(['none', 'boc'])
+        lst = {str(a): random.choice([0, 5000, 12000, 30000]) for a in range(68, 93)}
+        over = dict(calcMode='single', currentAge=68, alreadyRetired=True, spendFrequency='monthly', spendAmount=random.choice([3000, 6000]), currentRrsp=900000, currentTfsa=0,
+                    currentNonReg=0, contribNonReg=0, contribRrsp=0, contribTfsa=0, liraBalance=0, fedDcBalance=0, ftqBalance=0, ownPensionAnnual=0, ownPensionStartAge=60,
+                    inflationMode=infl, returnPre=4, returnPost=4, lifeExpectancy=92, livesAlone='yes', returnModel='flat', events=[], recurringEvents=[], extraRegAmt=0,
+                    otherIncOn=(i != 11), otherIncAmt=flat if i != 11 else 15000, otherIncBasis=basis, otherIncListOn=(i % 2 == 1), otherIncList=lst)
+        over['targetAge'] = 68; over[key] = 1000; over['oasMonthlyAmt'] = 740
+        rows = pg.evaluate("""([o]) => { const p = Object.assign(getProfileData(), o), rules = getTaxRules();
+            return runSimulation(p, 65, 65, rules, false).scheduleRows.map(r => {
+              const reg = r.rrspDraw + r.liraDraw + r.rlifUnlockedDraw + r.ftqDraw, gov = r.qppInc || r.cppInc || 0, oth = r.otherInc || 0;
+              const want = !o.otherIncOn ? 0 : (o.otherIncListOn ? (o.otherIncList[r.age] || 0) : o.otherIncAmt) * (o.otherIncBasis === 'year' ? 1 : r.inflationIndex);
+              const taxable = reg + gov + (r.oasIncGross - r.clawback) + r.pensionInc + oth + (r.nonRegYieldIncome || 0);
+              const tax = calculateTax(taxable, r.age, r.age >= 65 ? reg + r.pensionInc : r.pensionInc, scaleTaxRules(rules, r.inflationIndex), {alone: true}).totalTax;
+              const inn = r.rrspDraw + r.liraDraw + r.nonRegDraw + r.ftqDraw + r.tfsaDraw + r.rlifUnlockedDraw + gov + r.oasIncGross + r.pensionInc + oth;
+              return {age: r.age, dother: oth - want, resid: inn - (r.actualNetTakeHome + r.taxPaid + r.clawback + r.reinvested), dtax: r.taxPaid - tax}; }); }""", [over])
+        for r in rows:
+            oi_rows += 1
+            if abs(r['dother']) > 0.01: fails.append('other income: age %d, scenario %d: the plan used $%.2f more than the amount entered' % (r['age'], i, r['dother']))
+            if abs(r['resid']) > 1: fails.append('other income plan: age %d, scenario %d: money in minus money out is $%.2f' % (r['age'], i, r['resid']))
+            if abs(r['dtax']) > 5: fails.append('other income plan: age %d, scenario %d: tax differs from calculateTax by $%.2f' % (r['age'], i, r['dtax']))
+    print('other income: %d rows checked' % oi_rows)
     br.close()
 
 if fails:
