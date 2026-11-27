@@ -12,6 +12,15 @@ Edit only the block named; find it with `grep -n` or `docs/code-map.md`. Then ru
 4. `APP_VERSION` and `<title>` say "2026 rules": update the year. 5. Run the check and one plan.
 Users who customised rules on screen keep their own (`csl_tax_rules_v1`); that is expected.
 
+### January checklist, key by key (names as in `getDefaultTaxRules()`; grep the name)
+Usually change every year (take the new value from the official table, then set `verifiedDate`):
+- Federal: `fedBpaFull`, `fedBpaReduced`, `fedBpaPhaseStart`, `fedBpaPhaseEnd`, `fedBrackets`, `fedAgeAmountMax`, `fedAgeAmountThreshold`, `fedPensionAmountMax` (the pension amount is a fixed 2000 by law, check only), `oasClawbackThreshold`.
+- Quebec: `qcBpa`, `qcBrackets`, `qcAgeAmount`, `qcRetirementIncomeAmount`, `qcAloneAmount`, `qcSeniorReductionThreshold`; check `qcCreditRate`, `qcAbatementRate` and `qcSeniorReductionRate` against the law (`qcSeniorCredits()` holds the logic); `withholdingQcRate` is a flat rate: change only if the law changed.
+- `fedLifReferenceRate` (federal LIF maximum), `inflationNearTermPath` (next year first, then the long-run rate), `TFSA_ANNUAL_LIMIT`, and the CPP/QPP and OAS maximum monthly defaults in the form.
+Normally stay as they are (change only if the law or regulator changed them): `fedCreditRate`, `oasClawbackRate`, `rrifMinRates`, `rrifMinRate95Plus`, the withholding tiers and rates, `inflationLongRunRate`.
+
+Check the yearly tax check script too: `scripts/test_tax.py` has its own copy of the numbers (block "2026 PARAMETERS"); change it to the same new values or the Actions run turns red. Also search the page text for "2026" and update the year. Never guess a number: if the official 2027 table is not published yet, wait and keep the old one.
+
 ## 2. Change wording of a label or note
 grep the English text in `index.html`, change it in the HTML. Do not touch ids.
 - English only: there is no French layer in this app.
