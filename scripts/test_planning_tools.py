@@ -127,6 +127,24 @@ with sync_playwright() as pw:
     ico = pg.evaluate("(() => { const i = document.querySelector('.hero h2.hero-h svg.hero-ico'); return i ? i.getAttribute('aria-label') : null; })()")
     check(ico in ('Money lasts', 'Money runs out', 'Some risk'), 'headline icon missing: %s' % ico)
 
+    # 6d. Load scenario menu row is greyed out when nothing is saved; delete offers device-only or device and cloud
+    pg.evaluate("localStorage.removeItem('csl_all_profiles_v2026'); localStorage.removeItem('qcrp_profiles_v1'); localStorage.removeItem('onrp_profiles_v1'); window.awrCloudReady = false; refreshLoadItem()")
+    gr = pg.evaluate("(() => { const b = document.getElementById('menuLoad'); return b && b.disabled; })()")
+    check(gr is True, 'Load scenario should be greyed out with nothing saved, got %s' % gr)
+    pg.evaluate("window.awrCloudReady = true; window.awrSyncPlan = () => Promise.resolve('ok'); window.awrCloudCount = () => Promise.resolve(2); window.awrCloudRows = () => Promise.resolve([]); window.awrOpenCloud = () => { window.__opened = 1; }; refreshLoadItem()")
+    pg.wait_for_timeout(200)
+    gr = pg.evaluate("document.getElementById('menuLoad').disabled")
+    check(gr is False, 'Load scenario should be enabled when only the cloud has scenarios, got %s' % gr)
+    pg.evaluate("window.awrCloudRows = () => Promise.resolve(null); openLoadScenario()"); pg.wait_for_timeout(200)
+    check(pg.evaluate("window.__opened") == 1, 'cloud only and locked: the passphrase panel should open')
+    pg.evaluate("window.__del = []; window.awrDeletePlan = id => { window.__del.push(id); return Promise.resolve('ok'); }; calculateRetirementPlan(); document.getElementById('resultsProfileName').value = 'Del test'; document.getElementById('profileName').value = 'Del test'; saveProfileAndResultsNow(); showProfileManager()")
+    pid = pg.evaluate("Object.keys(getAllProfiles())[0]")
+    pg.evaluate("planCloudMark(getAllProfiles()['%s']); pendingDeleteId = '%s'; renderProfileManager()" % (pid, pid))
+    both = pg.evaluate("Array.from(document.querySelectorAll('#profileListContainer [data-act^=confirmDelete]')).map(b => b.textContent)")
+    check(len(both) == 2 and 'cloud' in both[1], 'delete should offer device only and device and cloud, got %s' % both)
+    pg.evaluate("document.querySelector('#profileListContainer [data-act=confirmDeleteBoth]').click()"); pg.wait_for_timeout(300)
+    check(pg.evaluate("window.__del.length") == 1 and pg.evaluate("Object.keys(getAllProfiles()).length") == 0, 'delete on device and cloud should call the cloud delete and remove the local copy')
+
     # 6c. results headline colour: green when the money lasts, red when it runs out
     hcol = pg.evaluate("(() => { const h = document.querySelector('.hero h2.hero-h'); return h ? [h.className, getComputedStyle(h).color] : null; })()")
     check(hcol is not None, 'headline colour: hero headline has no hero-h class')

@@ -250,6 +250,24 @@
   };
   window.awrResetPlan = function () { V.planId = null; };
   window.awrOpenCloud = function () { openPanel(); };
+  // How many cloud copies exist (needs no passphrase: the rows are listed encrypted).
+  window.awrCloudCount = function () {
+    if (V.rawRows != null) return Promise.resolve(V.rawRows.length);
+    return listRows().then(function (raw) { V.rawRows = raw; V.haveRows = raw.length > 0; return raw.length; }, function () { return 0; });
+  };
+  // Delete the cloud copy of one scenario: 'ok', 'none' (no cloud copy), 'locked' (passphrase panel opened) or 'fail'.
+  window.awrDeletePlan = function (planId) {
+    return autoUnlock().then(function (ok) {
+      if (!ok) { openPanel(); return 'locked'; }
+      var row = (V.rows || []).filter(function (r) { return r.p && r.p.id === planId; })[0];
+      if (!row) return 'none';
+      return deleteRow(row.rowId).then(function () {
+        V.rows = V.rows.filter(function (x) { return x.rowId !== row.rowId; }); V.haveRows = V.rows.length > 0;
+        if (V.rawRows) V.rawRows = V.rawRows.filter(function (x) { return x.id !== row.rowId; });
+        return 'ok';
+      });
+    }).catch(function () { return 'fail'; });
+  };
   window.awrCloudRows = function () { return autoUnlock().then(function (ok) { return ok ? (V.rows || []) : null; }, function () { return null; }); };
   function deleteRow(rowId) {
     return token().then(function (tk) { return call('DELETE', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(rowId), null, tk); })
@@ -327,7 +345,7 @@
           el('button', { class: 'awr-btn', type: 'button', onclick: function () { openPlan(r.p); closePanel(); } }, [t('open')]),
           el('button', { class: 'awr-btn sec bad', type: 'button', onclick: function () {
             if (!window.confirm(t('confirmDel'))) return;
-            deleteRow(r.rowId).then(function () { V.rows = V.rows.filter(function (x) { return x.rowId !== r.rowId; }); V.haveRows = V.rows.length > 0; say(msg, t('deleted'), 'good'); render(); })
+            deleteRow(r.rowId).then(function () { V.rows = V.rows.filter(function (x) { return x.rowId !== r.rowId; }); V.haveRows = V.rows.length > 0; if (V.rawRows) V.rawRows = V.rawRows.filter(function (x) { return x.id !== r.rowId; }); say(msg, t('deleted'), 'good'); render(); })
               .catch(function () { say(msg, t('saveFail'), 'bad'); });
           } }, [t('del')])]));
       });

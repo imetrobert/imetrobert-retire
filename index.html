@@ -544,7 +544,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
     <div class="tool-menu" id="toolMenu" hidden>
         <button type="button" class="menu-item" onclick="closeMenu(); showStep(7)"><span class="mi-ico">🎉</span><span>Life events<small>One-time and yearly costs</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); openExpenses()"><span class="mi-ico">🧾</span><span>Expenses<small>(if you need it to calculate your regular spend needs)</small></span></button>
-        <button type="button" class="menu-item" onclick="closeMenu(); showProfileManager()"><span class="mi-ico">📂</span><span>Load scenario<small>Reopen a scenario you saved</small></span></button>
+        <button type="button" class="menu-item" id="menuLoad" onclick="openLoadScenario()"><span class="mi-ico">📂</span><span>Load scenario<small>Reopen a scenario you saved</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); showTaxRulesPanel()"><span class="mi-ico">⚙️</span><span>Tax &amp; benefit rules<small>Brackets, credits, OAS, RRIF factors</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); startNewScenario()"><span class="mi-ico">🆕</span><span>New scenario<small>Start again from a blank form</small></span></button>
         <button type="button" class="menu-item" onclick="cycleTextSize()"><span class="mi-ico">🔎</span><span>Text size: <b id="tsLabel">Normal</b><small>Tap to make everything larger</small></span></button>
@@ -3524,8 +3524,8 @@ The numbers in that example are placeholders from a prior year — replace every
             if (this.checked) syncAllToCloud(); else renderProfileManager();
         };
         document.getElementById('awr-cloud-manage').onclick = function () { if (window.awrOpenCloud) window.awrOpenCloud(); };
-        if (!on || !window.awrCloudRows) return;
-        window.awrCloudRows().then(function (rows) {
+        if (!window.awrCloudRows) return;
+        (on || !window.awrCloudCount ? Promise.resolve(1) : window.awrCloudCount()).then(function (n) { return n > 0 ? window.awrCloudRows() : []; }).then(function (rows) {
             const o = document.getElementById('cloudOnly'); if (!o) return;
             if (rows === null) {
                 o.innerHTML = '<p class="note-text" style="margin:8px 0 4px;">Unlock your cloud copies to see scenarios saved on other devices.</p><button type="button" id="cloudUnlock">Unlock cloud copies</button>';
@@ -3662,6 +3662,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const title = p.name ? escHtml(p.name) : ('Unnamed scenario ' + (keys.length - i));
             const isRenaming = renamingId === k;
             const isDeleting = pendingDeleteId === k;
+            const cloudCopy = cloudAvailable() && (cloudOn() || !!syncMap[k]);
             html += `
                 <div id="pm-${escHtml(k)}" style="background:${isLatest ? '#f0fdf4' : '#fff'}; padding:10px; border-radius:6px; margin-bottom:8px; border:${isLatest ? '2px solid #16a34a' : '1px solid #cbd5e1'};">
                     <div style="margin-bottom:6px;">
@@ -3676,7 +3677,8 @@ The numbers in that example are placeholders from a prior year — replace every
                             <button type="button" style="${btn}" data-act="saveName" data-id="${escHtml(k)}">Save name</button>
                             <button type="button" class="secondary" style="${btn}" data-act="cancelRename" data-id="${escHtml(k)}">Cancel</button>
                         ` : isDeleting ? `
-                            <button type="button" class="warn-btn" style="${btn}" data-act="confirmDelete" data-id="${escHtml(k)}">Yes, delete permanently</button>
+                            ${cloudCopy ? `<button type="button" class="warn-btn" style="${btn}" data-act="confirmDelete" data-id="${escHtml(k)}">Delete on this device only</button>
+                            <button type="button" class="warn-btn" style="${btn}" data-act="confirmDeleteBoth" data-id="${escHtml(k)}">Delete on device and cloud</button>` : `<button type="button" class="warn-btn" style="${btn}" data-act="confirmDelete" data-id="${escHtml(k)}">Yes, delete permanently</button>`}
                             <button type="button" class="secondary" style="${btn}" data-act="cancelDelete" data-id="${escHtml(k)}">Keep it</button>
                         ` : `
                             <button type="button" style="${btn}" data-act="load" data-id="${escHtml(k)}">Load</button>
@@ -3722,6 +3724,7 @@ The numbers in that example are placeholders from a prior year — replace every
         else if (act === 'delete') { pendingDeleteId = id; renamingId = null; renderProfileManager(); }
         else if (act === 'cancelDelete') { pendingDeleteId = null; renderProfileManager(); }
         else if (act === 'confirmDelete') deleteSpecificProfile(id);
+        else if (act === 'confirmDeleteBoth') deleteScenarioEverywhere(id);
     });
 
     function renameSpecificProfile(id) {
@@ -3760,6 +3763,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const allProfiles = getAllProfiles();
         delete allProfiles[id];
         putAllProfiles(allProfiles);
+        try { const sm = getSyncMap(); delete sm[id]; localStorage.setItem(SYNC_KEY, JSON.stringify(sm)); } catch (e) { /* ignore */ }
         try {
             const cur = JSON.parse(localStorage.getItem('csl_retire_profile_v2026') || 'null');
             if (cur && cur.id === id) {
@@ -3770,6 +3774,33 @@ The numbers in that example are placeholders from a prior year — replace every
         pendingDeleteId = null;
         renderProfileManager();
         showSaveBadge('Profile deleted');
+    }
+
+    // ---- Load scenario menu row: greyed out until something is saved on this device or in the cloud
+    function localScenarioCount() { return Object.keys(getAllProfiles()).length; }
+    function refreshLoadItem() {
+        const b = document.getElementById('menuLoad'); if (!b) return;
+        const set = function (ok) {
+            b.disabled = !ok; b.setAttribute('aria-disabled', ok ? 'false' : 'true'); b.style.opacity = ok ? '' : '.45';
+            const sm = b.querySelector('small'); if (sm) sm.textContent = ok ? 'Reopen a scenario you saved' : 'No saved scenarios yet';
+        };
+        if (localScenarioCount() > 0) { set(true); return; }
+        set(false);
+        if (cloudAvailable() && window.awrCloudCount) window.awrCloudCount().then(function (n) { if (n > 0 && localScenarioCount() === 0) set(true); });
+    }
+    // Nothing on this device but something in the cloud: ask for the passphrase first; opening a scenario then saves it here.
+    function openLoadScenario() {
+        closeMenu();
+        if (localScenarioCount() > 0 || !cloudAvailable() || !window.awrCloudRows) { showProfileManager(); return; }
+        window.awrCloudRows().then(function (rows) { if (rows === null) window.awrOpenCloud(); else showProfileManager(); });
+    }
+    function deleteScenarioEverywhere(id) {
+        if (!window.awrDeletePlan) { deleteSpecificProfile(id); return; }
+        window.awrDeletePlan(id).then(function (r) {
+            if (r === 'ok' || r === 'none') { deleteSpecificProfile(id); if (r === 'ok') showSaveBadge('Deleted on this device and in the cloud'); }
+            else if (r === 'locked') showSaveBadge('Unlock your cloud copies, then delete again');
+            else showSaveBadge('Could not reach the cloud. Nothing was deleted');
+        });
     }
 
     function startNewScenario() {
@@ -5525,6 +5556,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const m = document.getElementById('toolMenu'), b = document.getElementById('menuBtn');
         const open = (typeof force === 'boolean') ? force : m.hasAttribute('hidden');
         if (open) m.removeAttribute('hidden'); else m.setAttribute('hidden', '');
+        if (open && typeof refreshLoadItem === 'function') refreshLoadItem();
         b.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     function closeMenu() { toggleMenu(false); }
