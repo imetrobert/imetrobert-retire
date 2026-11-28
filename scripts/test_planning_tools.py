@@ -116,6 +116,13 @@ with sync_playwright() as pw:
     ml = pg.evaluate("(() => { const c = document.querySelector('.plan-sum .wd-chart'); return c ? Array.from(c.querySelectorAll('line[stroke-width=\"2\"]')).length : -1; })()")
     check(ml == 1, 'pension lines: same start age should give one joint line, got %s' % ml)
 
+    # 6b3. tapping a bar opens that year's card
+    pg.evaluate("calculateRetirementPlan()")
+    tap = pg.evaluate("""(() => { const h = document.querySelectorAll('.plan-sum .wd-hit'); if (!h.length) return null;
+        const r = h[2]; const m = r.getAttribute('onclick').match(/goToYear\\((\\d+)\\)/); r.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        const d = document.getElementById('yp-' + m[1]); return {found: !!d, open: !!(d && d.open)}; })()""")
+    check(tap is not None and tap['found'] and tap['open'], 'bar tap: expected the year card to open, got %s' % tap)
+
     # 6c. results headline colour: green when the money lasts, red when it runs out
     hcol = pg.evaluate("(() => { const h = document.querySelector('.hero h2.hero-h'); return h ? [h.className, getComputedStyle(h).color] : null; })()")
     check(hcol is not None, 'headline colour: hero headline has no hero-h class')
