@@ -107,6 +107,15 @@ with sync_playwright() as pw:
         check(wd['bars'] >= 5 and wd['rects'] >= wd['bars'] and wd['legend'] >= 1, 'withdraw chart: expected bars, segments and a legend, got %s' % wd)
         check(wd['first'].startswith('$') or wd['first'] == '–', 'withdraw chart: the first bar has no total label (%s)' % wd['first'])
 
+    # 6b2. pension start lines on the withdrawal chart (solid line plus label at the QPP/CPP and OAS start ages)
+    pg.evaluate("document.getElementById('qppStartAge').value = 65; document.getElementById('oasStartAge').value = 67; calculateRetirementPlan()")
+    ml = pg.evaluate("""(() => { const c = document.querySelector('.plan-sum .wd-chart'); if (!c) return null;
+        return {lines: Array.from(c.querySelectorAll('line[stroke-width="2"]')).length, labels: Array.from(c.querySelectorAll('text')).map(t => t.textContent).filter(t => /starts|start$/.test(t))}; })()""")
+    check(ml is not None and ml['lines'] == 2 and len(ml['labels']) == 2, 'pension lines: expected 2 lines and 2 labels, got %s' % ml)
+    pg.evaluate("document.getElementById('qppStartAge').value = 67; document.getElementById('oasStartAge').value = 67; calculateRetirementPlan()")
+    ml = pg.evaluate("(() => { const c = document.querySelector('.plan-sum .wd-chart'); return c ? Array.from(c.querySelectorAll('line[stroke-width=\"2\"]')).length : -1; })()")
+    check(ml == 1, 'pension lines: same start age should give one joint line, got %s' % ml)
+
     # 6c. results headline colour: green when the money lasts, red when it runs out
     hcol = pg.evaluate("(() => { const h = document.querySelector('.hero h2.hero-h'); return h ? [h.className, getComputedStyle(h).color] : null; })()")
     check(hcol is not None, 'headline colour: hero headline has no hero-h class')
