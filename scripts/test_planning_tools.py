@@ -96,6 +96,17 @@ with sync_playwright() as pw:
         saved = pg.evaluate("resultsSummary().taxAtDeath")
         check(saved == want, 'saved compare: saved tax at death %s != plan %s' % (saved, want))
 
+    # 6b. results top: withdrawal bar chart (one stacked bar per year, total above each bar)
+    pg.evaluate("calculateRetirementPlan()")
+    wd = pg.evaluate("""(() => { const c = document.querySelector('.plan-sum .wd-chart'); if (!c) return null;
+        const t = Array.from(c.querySelectorAll('text.wd-total')).map(x => x.textContent);
+        return {bars: t.length, rects: c.querySelectorAll('rect').length, legend: c.querySelectorAll('.wd-key').length, first: t[0]}; })()""")
+    check(wd is not None, 'withdraw chart: missing from the results top')
+    if wd:
+        nyears = pg.evaluate("lastFinalRun.schedule ? lastFinalRun.schedule.filter(r => r.age <= getProfileData().lifeExpectancy).length : -1")
+        check(wd['bars'] >= 5 and wd['rects'] >= wd['bars'] and wd['legend'] >= 1, 'withdraw chart: expected bars, segments and a legend, got %s' % wd)
+        check(wd['first'].startswith('$') or wd['first'] == '–', 'withdraw chart: the first bar has no total label (%s)' % wd['first'])
+
     # 7. text size
     pg.evaluate("cycleTextSize()")
     check(pg.evaluate("document.body.style.zoom") == '1.15' and pg.evaluate("document.getElementById('tsLabel').textContent") == 'Large', 'text size: first tap should give Large')
