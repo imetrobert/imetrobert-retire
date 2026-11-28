@@ -629,7 +629,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
         </div>
 
         <div class="question-step" data-step="2">
-            <div class="step-head"><div class="eyebrow">Step 2 of 3</div><h2>Your money</h2><p>Spending goal, accounts and pensions. Tap a card to open it. Amounts marked “example” are placeholders: replace them with yours, or set them to 0.</p></div>
+            <div class="step-head"><div class="eyebrow">Step 2 of 3</div><h2>Your money</h2><p>Everyday spending, accounts and pensions. Tap a card to open it. Amounts marked “example” are placeholders: replace them with yours, or set them to 0.</p></div>
             <div class="expand-all"><button type="button" class="link-btn" onclick="setAllCards(true)">Expand all</button><button type="button" class="link-btn" onclick="setAllCards(false)">Collapse all</button></div>
             <label for="spendFrequency">How often do you want to be paid?</label>
             <select id="spendFrequency" onchange="updateSpendFrequencyLabel()">
@@ -637,9 +637,10 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                 <option value="weekly">Weekly</option>
                 <option value="yearly">Yearly</option>
             </select>
-            <label id="spendAmountLabel" for="spendAmount">Spending you want each month, after tax ($)</label>
+            <label id="spendAmountLabel" for="spendAmount">Everyday spending you want each month, after tax ($)</label>
             <input type="number" id="spendAmount" value="4000" step="100">
             <span class="note-text" id="spendFrequencyNote">Multiplied by 12 automatically for annual net spending targets. Withdrawing weekly instead of monthly also slightly changes how much growth your accounts earn during the year — see the note on Step 3.</span>
+            <span class="note-text">Everyday spending is the money you need for normal day-to-day life, after tax: housing, food, transport, insurance and the like. It leaves out special, year-specific costs (a trip, a wedding, a new roof, helping family). Set those up separately under Life events in the Menu, so they are planned for in the year they happen.</span>
             <div id="expLinkRow" class="exp-linkrow"><button type="button" class="link-btn" onclick="openExpenses()">Optional: calculate this from a list of your expenses →</button></div>
             <div id="expSpRow" class="exp-linkrow" hidden><button type="button" class="link-btn" onclick="hhOpenSharedExp()">Household expenses: see and change who pays what →</button></div>
             <div id="expLockBox" class="exp-lock" hidden>
@@ -2908,7 +2909,7 @@ The numbers in that example are placeholders from a prior year — replace every
 
     function updateSpendFrequencyLabel() {
         const freq = document.getElementById('spendFrequency').value;
-        document.getElementById('spendAmountLabel').innerText = 'Spending you want each ' + freqWord(freq) + ', after tax ($)';
+        document.getElementById('spendAmountLabel').innerText = 'Everyday spending you want each ' + freqWord(freq) + ', after tax ($)';
         document.getElementById('spendFrequencyNote').innerText = 'Today\'s dollars. We turn it into a yearly amount.';
     }
 
@@ -3892,7 +3893,7 @@ The numbers in that example are placeholders from a prior year — replace every
         });
 
         // The tax bill is paid from cash beyond spending, so cash beyond spending is "tax" until
-        // the bill is covered, in this order: pension income above living costs, the gap-fill
+        // the bill is covered, in this order: pension income above everyday spending, the gap-fill
         // draws, forced minimums, the planned melt-down, then TFSA top-ups. Only what is left
         // after the tax bill genuinely left the account without being spent — that is the
         // transfer. A gap-fill draw larger than the tax went to living costs (an account ran
@@ -5168,7 +5169,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 'Estate: at the end of the plan RRSP/RRIF + LIF/LIRA + RLIF + FTQ balances plus the taxable part of non-registered gains (nonRegCapitalGainsPct x 50% of the balance) are treated as income at death, stacked on the final year\'s regular income per person and taxed with the same federal/Quebec brackets and credits (and any OAS clawback). TFSA is tax-free. Spousal rollover, probate and estate fees are not modeled.',
                 'Inflation (when inputs.inflationMode is not none): all amounts in scheduleRows are in FUTURE (nominal) dollars. Spending (inputs.spendAmount, life events, extra withdrawals) is entered in today\'s dollars and multiplied by inflationIndex (compounded from inputs.currentAge). QPP/OAS are indexed fully; spouse RREGOP starts at its retirement-year price level then grows by inputs.rregopIndexPct of inflation. Tax brackets, BPAs, age/pension credits, Quebec credits and the OAS clawback threshold are indexed by inflationIndex; NOT indexed: the $2,000 federal pension amount and the withholding-tax dollar thresholds. TFSA room = $7,000 x index rounded to $500. Contributions before retirement stay as entered (not indexed). Returns are treated as nominal unless inputs.returnBasis is real, in which case they are converted: (1+real)(1+inflation)-1.',
                 'Monte Carlo volatility: if mcVolSource is "portfolio", the standard deviation is fixed at the value measured from the price history of the funds held today (blended at today\'s weights; mcVolBasis "recent" = latest 60 months, "long" = longest available up to 120). portfolioStats records the window, coverage and the calendar-year returns behind it. Otherwise it is the number entered. If mcRepeatable is true the random draws use a fixed seed, so identical inputs give identical results.',
-                'Withdrawal purposes (scheduleRows[].purposes): attribution only — it relabels amounts the model already decided and changes no draw, tax or balance. Each account\'s withdrawal is split into the piece drawn for (a) spending after QPP/OAS/pensions = income, (b) a life event (TFSA first, then non-registered, then the registered share) = event, (c) extra cash beyond spending = first the tax bill (pension income above living costs, then the after-tax gap-fill draws from non-registered/TFSA, then forced RRIF/LIF minimums, then planned melt-down, then TFSA top-ups) = tax, and (d) what is left after tax = transfer. income+event+tax+transfer equals that account\'s draw each year, and transfer equals the surplus the model reinvested. A gap-fill draw larger than the tax is counted as income (an account ran short). RLIF unlock (purposes.rlifUnlock) moves money inside the registered plan and is not part of any withdrawal. Amounts are rounded to cents here, so a split can differ from its draw by up to 2 cents.',
+                'Withdrawal purposes (scheduleRows[].purposes): attribution only — it relabels amounts the model already decided and changes no draw, tax or balance. Each account\'s withdrawal is split into the piece drawn for (a) spending after QPP/OAS/pensions = income, (b) a life event (TFSA first, then non-registered, then the registered share) = event, (c) extra cash beyond spending = first the tax bill (pension income above everyday spending, then the after-tax gap-fill draws from non-registered/TFSA, then forced RRIF/LIF minimums, then planned melt-down, then TFSA top-ups) = tax, and (d) what is left after tax = transfer. income+event+tax+transfer equals that account\'s draw each year, and transfer equals the surplus the model reinvested. A gap-fill draw larger than the tax is counted as income (an account ran short). RLIF unlock (purposes.rlifUnlock) moves money inside the registered plan and is not part of any withdrawal. Amounts are rounded to cents here, so a split can differ from its draw by up to 2 cents.',
                 'If returnModel is montecarlo, the table is ONE random trial (not reproducible); the per-year "rate" field shows the return that trial used.'
             ],
             results: {
@@ -5718,7 +5719,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const living = Math.min(r.actualNetTakeHome, tgt);
             // 1) Spending
             const genPen = Math.max(0, living - sumP('income'));
-            let s1 = R('General living costs', living) + (has(genPen) ? R('From QPP / OAS / pension', genPen, true) : '') + frm(accLines(k => pu[k] ? pu[k].income : 0));
+            let s1 = R('Everyday spending', living) + (has(genPen) ? R('From QPP / OAS / pension', genPen, true) : '') + frm(accLines(k => pu[k] ? pu[k].income : 0));
             if (has(evt)) {
                 const det = (r.eventDetailsThisYear && r.eventDetailsThisYear.length) ? r.eventDetailsThisYear : [{ name: (r.eventNamesThisYear || []).join(', ') || 'Life event', future: 1 }];
                 const dsum = det.reduce((t, e) => t + (e.future || 0), 0) || 1;
@@ -5791,7 +5792,7 @@ The numbers in that example are placeholders from a prior year — replace every
             if (has(pens)) {
                 acctHtml += '<div class="yp-acct pen"><div class="yp-ah"><span>Income that arrives on its own</span><b>' + fmtNum(pens) + '</b></div>' +
                     [[r.qppInc, 'QPP'], [r.oasIncGross, 'OAS'], [r.pensionInc, "your spouse's public-sector pension"], [r.otherInc, 'your other income']].filter(x => has(x[0])).map(x => '<div class="yp-al">From ' + x[1] + ' <b>' + fmtNum(x[0]) + '</b></div>').join('') +
-                    (has(pensCover) ? '<div class="yp-al">Goes to spending <b>' + fmtNum(pensCover) + '</b></div>' : '') +
+                    (has(pensCover) ? '<div class="yp-al">Goes to everyday spending <b>' + fmtNum(pensCover) + '</b></div>' : '') +
                     (has(taxPen) ? '<div class="yp-al">Goes to tax <b>' + fmtNum(taxPen) + '</b></div>' : '') +
                     (has(penMove) ? '<div class="yp-al">Moved or reinvested <b>' + fmtNum(penMove) + '</b></div>' : '') + '</div>';
             }
@@ -5803,7 +5804,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 if (!x || (!has(x.wd) && !has(x.recv) && !x.note.length)) { const bv = balOf(lbl); if (has(bv) && !AB[lbl]) idle.push(lbl + ' (' + fmtCompact(bv) + ')'); return; }
                 const bv = balOf(lbl);
                 acctHtml += '<div class="yp-acct"><div class="yp-ah"><span>' + lbl + '</span><b>' + (has(x.wd) ? 'Withdraw ' + fmtNum(x.wd) : (has(x.recv) ? 'Receives ' + fmtNum(x.recv) : 'No withdrawal')) + '</b></div>';
-                if (has(x.inc)) acctHtml += '<div class="yp-al">Goes to living costs <b>' + fmtNum(x.inc) + '</b></div>';
+                if (has(x.inc)) acctHtml += '<div class="yp-al">Goes to everyday spending <b>' + fmtNum(x.inc) + '</b></div>';
                 if (has(x.evt)) {
                     acctHtml += '<div class="yp-al">Goes to life events <b>' + fmtNum(x.evt) + '</b></div>';
                     // Which events this withdrawal pays for: shared in proportion to each event's cost this year.

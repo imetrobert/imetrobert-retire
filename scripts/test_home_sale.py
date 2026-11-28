@@ -67,6 +67,13 @@ with sync_playwright() as pw:
         pg.evaluate("document.getElementById('homeSaleAge').value = 75; calculateRetirementPlan(); window.QCRP_I18N.toggle()"); pg.wait_for_timeout(600)
         txt = pg.evaluate("document.getElementById('homeSaleCard').innerText + ' ' + document.getElementById('heroSummary').innerText")
         check('Vente de votre maison' in txt and 'Vente de la maison' in txt, 'French text missing: %r' % txt[:160])
+    # one term for the same thing: "Everyday spending" on the Money step, the year cards and the info note
+    pg.evaluate("document.getElementById('homeSaleDecl').value = 'no'; hsUi(); calculateRetirementPlan()")
+    lab = pg.evaluate("document.getElementById('spendAmountLabel').innerText")
+    cards = pg.evaluate("document.getElementById('yearCards').innerText")
+    check(lab.lower().startswith('everyday spending') or lab.lower().startswith('d\u00e9penses courantes'), 'Money step label should say Everyday spending: %r' % lab)
+    check('living costs' not in cards.lower() and 'frais courants' not in cards.lower(), 'year cards should not say living costs')
+    check(pg.evaluate("document.body.innerHTML.toLowerCase().includes('everyday spending is the money')") or pg.evaluate("!!document.querySelector('.info-btn')"), 'definition note missing')
     check(not errors, 'page errors: %s' % errors[:3])
     br.close()
 if fails:

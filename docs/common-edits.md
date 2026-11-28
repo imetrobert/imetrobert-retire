@@ -202,3 +202,9 @@ Step 1 asks "Do you plan to sell your home during retirement?" (`homeSaleDecl`: 
 - Not in the tax check: it adds no taxable income by itself; the invested money is taxed through the normal non-registered yield and gain rules.
 - This planner has no French layer: English text only.
 - Test: `python3 scripts/test_home_sale.py` (card hidden until Yes, net amount, TFSA cap, all-non-registered option, rent, spending change from the sale year, save and reload, results note, sale age below retirement age). Runs in Checks.
+
+## 19. Wording: "Everyday spending" (one name for the same money)
+The Step 2 field, the year cards and the help note use ONE phrase so the labels reconcile: **Everyday spending** = the money for normal day-to-day life, after tax, excluding special year-specific costs (those are Life events in the Menu).
+- Where the words live (grep them): the label `spendAmountLabel` in the HTML and again in the JS that rewrites it when the frequency changes ("Everyday spending you want each month, after tax ($)"); the `note-text` just under the field (it becomes the blue "Why this matters" button; its text is the definition); the year-card lines `R('Everyday spending', ...)` and "Goes to everyday spending" (also used for pension income that pays everyday spending); the Step 2 heading sentence "Everyday spending, accounts and pensions."; the audit text "pension income above everyday spending".
+- Change it in all of those places in all three planners, plus the guide (Step 2 chapter and the glossary row) and, in Quebec, the French entries. This planner has no French layer.
+- Test: `python3 scripts/test_home_sale.py` ends with a check that the Step 2 label says Everyday spending and the year cards no longer say living costs.
