@@ -90,6 +90,11 @@ with sync_playwright() as pw:
     check(len(r) == 9, 'saved compare: expected 9 rows, got %d' % len(r))
     if r:
         check(r[0][0] == 'Retirement age' and r[0][1] != r[0][2], 'saved compare: retirement ages should differ')
+        # Regression: the saved tax at death was NaN (an estate object was rounded), so the table showed $NaN
+        check(not any('NaN' in c for row in r for c in row), 'saved compare: a cell shows NaN')
+        want = pg.evaluate("Math.round(lastFinalRun.taxAtDeath.taxAtDeath)")
+        saved = pg.evaluate("resultsSummary().taxAtDeath")
+        check(saved == want, 'saved compare: saved tax at death %s != plan %s' % (saved, want))
 
     # 7. text size
     pg.evaluate("cycleTextSize()")

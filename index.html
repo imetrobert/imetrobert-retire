@@ -3393,7 +3393,7 @@ The numbers in that example are placeholders from a prior year — replace every
             depletionAge: lastFinalRun.depletionAge,
             finalPortfolio: Math.round(lastFinalRun.finalPortfolio || 0),
             totalTaxesPaid: Math.round(lastFinalRun.totalTaxesPaid || 0),
-            taxAtDeath: Math.round(lastFinalRun.taxAtDeath || 0),
+            taxAtDeath: Math.round((lastFinalRun.taxAtDeath && lastFinalRun.taxAtDeath.taxAtDeath) || 0),
             mc: mc ? {
                 trials: mc.trials, successRate: mc.successRate, medianDepletionAge: mc.medianDepletionAge,
                 p10: Math.round(mc.p10Portfolio), p50: Math.round(mc.p50Portfolio), p90: Math.round(mc.p90Portfolio)
@@ -7108,8 +7108,8 @@ The numbers in that example are placeholders from a prior year — replace every
         if (!a || !b) { box.innerHTML = '<p class="note-text">Pick two scenarios.</p>'; return; }
         const f = x => (x.r ? x.r : null);
         const lasts = r => r ? (r.depletionAge === null || r.depletionAge === undefined ? 'Yes' : 'Short at ' + r.depletionAge) : 'No results saved';
-        const m = (r, k) => r ? money(r[k]) : '—';
-        const est = r => r ? money((r.finalPortfolio || 0) - (r.taxAtDeath || 0)) : '—';
+        const m = (r, k) => (r && typeof r[k] === 'number' && isFinite(r[k])) ? money(r[k]) : '—';
+        const est = r => (r && typeof r.taxAtDeath === 'number' && isFinite(r.taxAtDeath)) ? money((r.finalPortfolio || 0) - r.taxAtDeath) : '—';
         const spend = p => money(p.spendAmount) + ' ' + (p.spendFrequency === 'weekly' ? 'a week' : p.spendFrequency === 'yearly' ? 'a year' : 'a month');
         const rows = [
             ['Retirement age', String(a.p.targetAge), String(b.p.targetAge)],
