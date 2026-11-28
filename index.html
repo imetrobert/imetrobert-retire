@@ -501,6 +501,7 @@ details.tipbox>div{padding:0 12px 12px;font-size:14px;color:#1e293b}
 .yp-main small{display:block;color:#64748b;font-size:13px;margin-top:2px}
 .yp-chev{color:#94a3b8;font-size:20px;transition:transform .15s}
 .yp[open] .yp-chev{transform:rotate(90deg)}
+.save-big{width:100%;font-size:1.15rem;padding:16px;margin-top:12px}
 .yp-flash{outline:3px solid #2563eb;outline-offset:2px;border-radius:10px;transition:outline-color .4s}.wd-hit:hover{fill:rgba(37,99,235,.08)}
 .yp-body{padding:0 14px 14px;border-top:1px solid #f1f5f9}
 .yp-step{margin-top:14px}
@@ -542,8 +543,7 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
     <div class="tool-menu" id="toolMenu" hidden>
         <button type="button" class="menu-item" onclick="closeMenu(); showStep(7)"><span class="mi-ico">🎉</span><span>Life events<small>One-time and yearly costs</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); openExpenses()"><span class="mi-ico">🧾</span><span>Expenses<small>(if you need it to calculate your regular spend needs)</small></span></button>
-        <div class="menu-note">Two ways to save your scenarios</div>
-        <button type="button" class="menu-item" onclick="closeMenu(); showProfileManager()"><span class="mi-ico">📁</span><span>Save / load scenarios on this device<small>Reopen your scenarios any time on this device</small></span></button>
+        <button type="button" class="menu-item" onclick="closeMenu(); showProfileManager()"><span class="mi-ico">📂</span><span>Load scenario<small>Reopen a scenario you saved</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); showTaxRulesPanel()"><span class="mi-ico">⚙️</span><span>Tax &amp; benefit rules<small>Brackets, credits, OAS, RRIF factors</small></span></button>
         <button type="button" class="menu-item" onclick="closeMenu(); startNewScenario()"><span class="mi-ico">🆕</span><span>New scenario<small>Start again from a blank form</small></span></button>
         <button type="button" class="menu-item" onclick="cycleTextSize()"><span class="mi-ico">🔎</span><span>Text size: <b id="tsLabel">Normal</b><small>Tap to make everything larger</small></span></button>
@@ -1175,20 +1175,21 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                 <label for="resultsProfileName">Name this scenario (optional):</label>
                 <input type="text" id="resultsProfileName" maxlength="60" placeholder="e.g. Base case, Retire at 55, Bear market test" oninput="document.getElementById('profileName').value = this.value;">
                 <div id="saveResultsStatus" class="note-text" style="margin:0;">Not saved yet.</div>
+                <button type="button" class="save-btn save-big" onclick="saveScenario()">💾 Save scenario</button>
+                <div id="cloudSaveNote" class="note-text" style="margin:6px 0 0;"></div>
             </div>
-            <span class="note-text">Every calculation auto-saves your inputs as a draft. To keep this plan <em>and its results</em> under a name, tap <strong>💾 Save on this device</strong> — it is then listed as saved by you under "Manage Saved Profiles".</span>
+            <span class="note-text">Every calculation auto-saves your inputs as a draft. To keep this plan <em>and its results</em> under a name, tap <strong>💾 Save scenario</strong>. To open it again later, choose <strong>Load scenario</strong> in the menu.</span>
 
             <div class="btn-group step-nav step-nav-3">
                 <button type="button" class="secondary" onclick="editProfile()">← Edit inputs</button>
-                <button type="button" class="save-btn" onclick="saveProfileAndResults()">💾 Save on this device</button>
-                <button type="button" class="save-btn" onclick="saveToBoth()">☁ Save on device and cloud</button>
             </div>
         </div>
 
         <div class="question-step" data-step="5">
 
-            <div class="step-head"><div class="eyebrow">Saved</div><h2>Saved on this device</h2></div>
-            <div class="ai-card" id="deviceNote"><p><strong>Two ways to save your scenarios.</strong></p><p><strong>On this device:</strong> the copies below stay in this browser on this device. You can reopen them any time here, but if you clear your browser data they are gone.</p><p><strong>In the cloud:</strong> use it to keep your scenarios safe and open them on any device. They are encrypted, and you open them with your passphrase.</p><button type="button" class="secondary" onclick="var m = document.getElementById('awr-mi-plans'); if (m) m.click();">Open scenarios in the cloud</button></div>
+            <div class="step-head"><div class="eyebrow">Saved</div><h2>Load scenario</h2></div>
+            <div class="ai-card" id="deviceNote"><p>Scenarios you saved on this device. Tap Load to reopen one.</p></div>
+            <div id="cloudBox"></div>
             <div class="results-box" id="profileListContainer">
                 <p>No saved profiles found.</p>
             </div>
@@ -3474,16 +3475,72 @@ The numbers in that example are placeholders from a prior year — replace every
         updateSaveStatus();
     }
 
-    // Saves on this device, then pushes the same scenario to the cloud (asks for the passphrase first if locked).
-    function saveToBoth() { saveWithChoice(saveToBothNow); }
-    function saveToBothNow() {
+    // ---- Cloud copy: optional. Saving always goes to this device first; when the cloud copy is on, every save and rename also updates it.
+    const CLOUD_KEY = 'csl_cloud_sync';
+    function cloudAvailable() { return !!(window.awrSyncPlan && window.awrCloudReady); }
+    function cloudOn() { try { return cloudAvailable() && localStorage.getItem(CLOUD_KEY) === '1'; } catch (e) { return false; } }
+    function saveScenario() { saveWithChoice(saveScenarioNow); }
+    function saveScenarioNow() {
         saveProfileAndResultsNow();
+        if (!cloudOn()) return;
         const cur = getAllProfiles()[justSavedId];
-        if (!cur || !window.awrSyncPlan) { showSaveBadge('Saved on this device. Cloud saving is not available here'); return; }
+        if (!cur) return;
         window.awrSyncPlan(cur).then(function (r) {
             if (r === 'ok') showSaveBadge('Saved on this device and in the cloud');
             else if (r === 'fail') showSaveBadge('Saved on this device. Could not reach the cloud, try Sync to cloud later');
             /* locked: the passphrase panel opened; the device copy is already saved */
+            updateCloudNote();
+        });
+    }
+    function updateCloudNote() {
+        const n = document.getElementById('cloudSaveNote'); if (!n) return;
+        n.textContent = cloudAvailable() ? (cloudOn() ? 'Cloud copy is on: each save also updates your cloud copy.' : 'Saved on this device only. You can turn on a cloud copy from Load scenario in the menu.') : '';
+    }
+    // Every saved scenario goes to the cloud when the copy is turned on.
+    function syncAllToCloud() {
+        const all = getAllProfiles(), ids = Object.keys(all).filter(k => all[k].savedExplicitly);
+        ids.reduce((p, k) => p.then(r => (r === 'locked' || r === 'fail') ? r : window.awrSyncPlan(all[k])), Promise.resolve('ok')).then(function (r) {
+            if (r === 'ok') showSaveBadge('Cloud copy is on: your saved scenarios are in the cloud');
+            else if (r === 'fail') showSaveBadge('Could not reach the cloud. It will sync on your next save');
+            renderProfileManager();
+        });
+    }
+    // A scenario that exists only in the cloud (saved on another device) is copied to this device, then loaded.
+    window.planAdopt = function (p) {
+        const all = getAllProfiles(); p.savedExplicitly = true; all[p.id] = p; putAllProfiles(all);
+        if (window.planCloudMark) window.planCloudMark(p);
+    };
+    function renderCloudBox() {
+        const box = document.getElementById('cloudBox'); if (!box) return;
+        updateCloudNote();
+        if (!cloudAvailable()) { box.innerHTML = ''; return; }
+        const on = cloudOn();
+        box.innerHTML = '<div class="ai-card"><label style="display:flex; gap:10px; align-items:flex-start; font-weight:600;"><input type="checkbox" id="cloudToggle" style="margin-top:4px;"' + (on ? ' checked' : '') + '><span>Also keep a copy in the cloud (to use on other devices)</span></label>' +
+            '<p class="note-text" style="margin:6px 0;">Optional. Every save goes to this device first. With this on, each save also updates an encrypted cloud copy.</p>' +
+            '<button type="button" class="secondary" id="awr-cloud-manage">Manage cloud copies</button><div id="cloudOnly"></div></div>';
+        document.getElementById('cloudToggle').onchange = function () {
+            try { localStorage.setItem(CLOUD_KEY, this.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+            if (this.checked) syncAllToCloud(); else renderProfileManager();
+        };
+        document.getElementById('awr-cloud-manage').onclick = function () { if (window.awrOpenCloud) window.awrOpenCloud(); };
+        if (!on || !window.awrCloudRows) return;
+        window.awrCloudRows().then(function (rows) {
+            const o = document.getElementById('cloudOnly'); if (!o) return;
+            if (rows === null) {
+                o.innerHTML = '<p class="note-text" style="margin:8px 0 4px;">Unlock your cloud copies to see scenarios saved on other devices.</p><button type="button" id="cloudUnlock">Unlock cloud copies</button>';
+                document.getElementById('cloudUnlock').onclick = function () { if (window.awrOpenCloud) window.awrOpenCloud(); };
+                return;
+            }
+            const local = getAllProfiles(), only = rows.filter(r => r.p && r.p.id && !local[r.p.id]);
+            if (!only.length) return;
+            const h = document.createElement('p'); h.style.cssText = 'font-weight:600; margin:10px 0 4px;'; h.textContent = 'Only in the cloud'; o.appendChild(h);
+            only.forEach(function (r) {
+                const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:8px; align-items:center; justify-content:space-between; margin:6px 0;';
+                const nm = document.createElement('strong'); nm.textContent = r.p.name || 'Unnamed scenario';
+                const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = 'Download and load'; bt.style.cssText = 'padding:6px 12px; font-size:12px;';
+                bt.onclick = function () { window.planAdopt(r.p); loadSpecificProfile(r.p.id); };
+                row.appendChild(nm); row.appendChild(bt); o.appendChild(row);
+            });
         });
     }
 
@@ -3505,6 +3562,7 @@ The numbers in that example are placeholders from a prior year — replace every
     function updateSaveStatus() {
         const el = document.getElementById('saveResultsStatus');
         if (!el) return;
+        updateCloudNote();
         const nameBox = document.getElementById('resultsProfileName');
         if (nameBox && document.activeElement !== nameBox) nameBox.value = document.getElementById('profileName').value || '';
         let cur = null;
@@ -3513,7 +3571,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const label = cur.name ? '“' + cur.name + '”' : 'this scenario';
         if (cur.savedExplicitly && cur.dirty) {
             el.style.color = '#a16207';
-            el.textContent = 'You changed “' + (((getAllProfiles()[cur.id] || {}).name) || cur.name || 'this scenario') + '” but have not saved the changes. Tap "Save on this device" to keep them (you can overwrite it or save a new scenario).';
+            el.textContent = 'You changed “' + (((getAllProfiles()[cur.id] || {}).name) || cur.name || 'this scenario') + '” but have not saved the changes. Tap "Save scenario" to keep them (you can overwrite it or save a new scenario).';
             return;
         }
         if (cur.savedExplicitly) {
@@ -3522,7 +3580,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 '. Your profile setup and these results are under "Manage Saved Profiles".';
         } else {
             el.style.color = '#a16207';
-            el.textContent = 'Auto-saved as a draft (' + (cur.timestamp || '') + '). Tap "Save on this device" to keep it' + (cur.name ? '' : ' — add a name above first if you like') + '.';
+            el.textContent = 'Auto-saved as a draft (' + (cur.timestamp || '') + '). Tap "Save scenario" to keep it' + (cur.name ? '' : ' — add a name above first if you like') + '.';
         }
     }
 
@@ -3576,6 +3634,7 @@ The numbers in that example are placeholders from a prior year — replace every
     };
 
     function renderProfileManager() {
+        renderCloudBox();
         const container = document.getElementById('profileListContainer');
         const allProfiles = getAllProfiles();
         const keys = Object.keys(allProfiles).sort((a, b) => (allProfiles[b].timestampMs || 0) - (allProfiles[a].timestampMs || 0));
@@ -3593,8 +3652,8 @@ The numbers in that example are placeholders from a prior year — replace every
             const isJust = justSavedId === k, isLatest = isJust || (k === latestId && Date.now() - latestMs < 24 * 3600 * 1000);
             const sync = !syncMap[k] ? 'none' : (syncMap[k] === planSig(p) ? 'same' : 'diff');
             const btn = 'padding:6px 12px; font-size:12px;';
-            const syncBtn = sync === 'same' ? '' : `<button type="button" style="${btn}" data-act="sync" data-id="${escHtml(k)}">Sync to cloud</button>`;
-            const syncHtml = sync === 'same' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#dcfce7; color:#166534; font-size:12px; font-weight:600;">☁ Same on this device and in the cloud</span>'
+            const syncBtn = (sync === 'same' || !cloudOn()) ? '' : `<button type="button" style="${btn}" data-act="sync" data-id="${escHtml(k)}">Sync to cloud</button>`;
+            const syncHtml = !cloudOn() ? '' : sync === 'same' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#dcfce7; color:#166534; font-size:12px; font-weight:600;">☁ Same on this device and in the cloud</span>'
                 : sync === 'diff' ? '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#ffedd5; color:#9a3412; font-size:12px; font-weight:600;">⚠ Newer on this device than in the cloud</span>'
                 : '<span style="display:block; margin-top:4px; padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:12px; font-weight:600;">Device only, not in the cloud yet</span>';
             const pill = isLatest ? '<span style="display:inline-block; margin:0 0 6px; padding:2px 9px; border-radius:999px; background:#166534; color:#fff; font-size:11px; font-weight:700; letter-spacing:.05em;">' + (isJust ? 'JUST SAVED' : 'LATEST SAVE') + '</span><br>' : '';
@@ -3671,6 +3730,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const name = input ? input.value.trim() : '';
         all[id].name = name;
         putAllProfiles(all);
+        if (cloudOn()) window.awrSyncPlan(all[id]);
         // Keep the "currently loaded" copy and the form field in sync.
         try {
             const cur = JSON.parse(localStorage.getItem('csl_retire_profile_v2026') || 'null');
@@ -7131,7 +7191,7 @@ The numbers in that example are placeholders from a prior year — replace every
     window.ptFillSaved = function () {
         const list = savedList(), box = $('ptBoxSaved');
         if (!box) return;
-        if (list.length < 1) { box.innerHTML = '<p class="note-text">Save at least one scenario with its results first (Results, then Save on this device).</p>'; $('ptSavedPick').hidden = true; return; }
+        if (list.length < 1) { box.innerHTML = '<p class="note-text">Save at least one scenario with its results first (Results, then Save scenario).</p>'; $('ptSavedPick').hidden = true; return; }
         $('ptSavedPick').hidden = false;
         ['ptSavedA', 'ptSavedB'].forEach((id, n) => {
             const s = $(id), keep = s.value;
