@@ -65,6 +65,27 @@ with sync_playwright() as pw:
     r1 = avg_shown(); pg.click('#mcRunBanner .mc-rerun'); r2 = avg_shown()
     check(r1 != r2, 'Re-run without repeatable gave the same market')
 
+    # "Judge the plan by": badge follows this run (default) or the share of the 300 markets that fund the plan
+    pg.evaluate("document.getElementById('mcRepeatable').checked = true; mcRerunN = 0; mcSeedShift = 0; calculateRetirementPlan()")
+    def hero():
+        return pg.evaluate("(() => ({badge: document.querySelector('#heroSummary .hero-badge').innerText, h2: document.querySelector('#heroSummary h2').innerText, on: (document.querySelector('.mc-judge button.on')||{}).innerText}))()")
+    h0 = hero()
+    check(h0['on'] and h0['on'].strip().lower() in ('this run', 'cette simulation'), 'default judge should be This run: %r' % h0)
+    pct = pg.evaluate("Math.round(lastAuditMeta.monteCarlo.successRate * 100)")
+    lvl = 'ok' if pct >= 90 else ('risk' if pct >= 70 else 'short')
+    pg.click('.mc-judge button:nth-of-type(2)')
+    h1 = hero()
+    check(('%d' % pct) in h1['h2'] and 'market' in h1['h2'].lower() or 'march' in h1['h2'].lower(), 'all-markets headline should show %d%%: %r' % (pct, h1))
+    want = {'ok': ('You are on track', 'Sur la bonne voie'), 'risk': ('Some risk', 'Risque mod'), 'short': ('Needs a change', 'Changement')}[lvl]
+    check(pg.evaluate("document.querySelector('#heroSummary .hero').classList.contains('short')") == (lvl != 'ok'), 'badge colour should match level %s at %d%%' % (lvl, pct))
+    pg.click('#mcRunBanner .mc-rerun')
+    check(pg.evaluate("(document.querySelector('.mc-judge button.on')||{}).innerText").strip().lower() in ('all markets', 'tous les march\u00e9s'), 'choice should stay on All markets after a re-run')
+    pg.click('.mc-judge button:nth-of-type(1)')
+    check(hero()['on'].strip().lower() in ('this run', 'cette simulation'), 'back to This run')
+    pg.evaluate("document.getElementById('returnModel').value = 'flat'; calculateRetirementPlan()")
+    check(pg.evaluate("document.querySelectorAll('.mc-judge').length") == 0, 'flat model should not show the judge toggle')
+    pg.evaluate("document.getElementById('returnModel').value = 'montecarlo'; calculateRetirementPlan()")
+
     # French (Quebec planner only)
     if pg.evaluate("!!(window.QCRP_I18N && window.QCRP_I18N.toggle)"):
         pg.evaluate("window.QCRP_I18N.toggle()")

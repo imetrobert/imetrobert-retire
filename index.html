@@ -269,6 +269,9 @@ EDIT SAFELY: change wording in the HTML only for labels; do not rename element i
         .hero h2 { color: #fff; font-size: 1.4rem; margin: 0.65rem 0 0.2rem; }
         .hero p { margin: 0; font-size: 0.88rem; opacity: 0.95; }
         .hero-mc { margin-top: 0.6rem !important; font-size: 0.82rem !important; background: rgba(255,255,255,0.16); border-radius: 10px; padding: 0.45rem 0.7rem; }
+        .mc-judge { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.5rem; font-size: 0.78rem; }
+        .mc-judge button { min-height: 36px; padding: 0 0.8rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.55); background: transparent; color: inherit; font: inherit; font-weight: 600; }
+        .mc-judge button.on { background: #fff; color: #1e293b; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.9rem; }
         .stat-card { background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); border-radius: 12px; padding: 0.7rem 0.75rem; }
         .stat-number { display: block; font-family: var(--font-mono); font-weight: 700; font-size: 1.15rem; line-height: 1.2; }
@@ -4697,7 +4700,7 @@ The numbers in that example are placeholders from a prior year — replace every
             '</div>' +
             (startNote ? '<p class="mc-note">' + startNote + '</p>' : '') +
             '<p class="mc-foot"><span>This run ended with more savings than</span> <b>' + rank + '%</b> <span>of the</span> <b>' + finals.length + '</b> <span>simulated markets.</span> ' +
-            '<span>Every figure below (tax, savings left, “on track”) comes from this one run.</span></p>' +
+            '<span>Every figure below (tax and savings left) comes from this one run.</span></p>' +
             '<button type="button" class="save-btn mc-rerun" onclick="mcRerun()">Re-run another scenario</button>' +
             '<span class="mc-hint">Draws a new random set of markets and recalculates.</span>' +
             '</div>';
@@ -5858,7 +5861,11 @@ The numbers in that example are placeholders from a prior year — replace every
         return h + '</div>';
     }
 
+    // "Judge the plan by": the on-track badge follows this one run (default) or the share of the 300 Monte Carlo markets that fund the plan.
+    let mcJudge = 'run', lastResultsArgs = null;
+    function mcSetJudge(v) { mcJudge = v; if (lastResultsArgs) renderResultsUi.apply(null, lastResultsArgs); }
     function renderResultsUi(finalRun, p, taxRules, qppAge, oasAge) {
+
         const hero = document.getElementById('heroSummary');
         if (!hero) return;
         const infl = (p.inflationMode || 'none') !== 'none';
@@ -5878,15 +5885,25 @@ The numbers in that example are placeholders from a prior year — replace every
         const todayNote = (infl && !p.showRealDollars && !short && rows.length && lastRow)
             ? '<p class="hero-note">In future dollars that is ' + fmtNum(rows[0].actualNetTakeHome / perN) + '/' + freqWord(p.spendFrequency) + ' at ' + rows[0].age + ' and ' + fmtNum(lastRow.actualNetTakeHome / perN) + '/' + freqWord(p.spendFrequency) + ' at ' + lastRow.age + ': the same buying power as ' + spendTxt + ' today.</p>' : '';
         const mc = (p.returnModel === 'montecarlo' && lastAuditMeta && lastAuditMeta.monteCarlo) ? lastAuditMeta.monteCarlo : null;
+        lastResultsArgs = [finalRun, p, taxRules, qppAge, oasAge];
+        const judgeOn = !!mc && !p.hhRole;
+        const byAll = judgeOn && mcJudge === 'all';
+        const pctAll = mc ? Math.round(mc.successRate * 100) : 0;
+        const level = byAll ? (pctAll >= 90 ? 'ok' : (pctAll >= 70 ? 'risk' : 'short')) : (short ? 'short' : 'ok');
+        const badgeTxt = level === 'ok' ? 'You are on track' : (level === 'risk' ? 'Some risk' : 'Needs a change');
+        const judgeHtml = judgeOn ? '<div class="mc-judge"><span>Judge the plan by</span>' +
+            '<button type="button" class="' + (byAll ? '' : 'on') + '" onclick="mcSetJudge(\'run\')">This run</button>' +
+            '<button type="button" class="' + (byAll ? 'on' : '') + '" onclick="mcSetJudge(\'all\')">All markets</button></div>' : '';
         hero.innerHTML =
-            '<div class="hero' + (short ? ' short' : '') + '">' +
-            '<span class="hero-badge">' + (short ? 'Needs a change' : 'You are on track') + '</span>' +
-            '<h2>' + (short ? 'Money runs out at age ' + shortfall.age : 'Your money lasts to age ' + p.lifeExpectancy) + '</h2>' +
-            '<p>' + (short
+            '<div class="hero' + (level !== 'ok' ? ' short' : '') + '">' +
+            '<span class="hero-badge">' + badgeTxt + '</span>' +
+            '<h2>' + (byAll ? 'Your plan works in ' + pctAll + '% of markets' : short ? 'Money runs out at age ' + shortfall.age : 'Your money lasts to age ' + p.lifeExpectancy) + '</h2>' +
+            '<p>' + (byAll ? 'Judged across all ' + mc.trials + ' simulated markets, not just this run.' : short
                 ? 'Your ' + spendTxt + ' target can’t be fully met from age ' + shortfall.age + ' (take-home drops to ' + fmtNum(shortfall.actualNetTakeHome) + ' a year). You could spend a little less, retire later, or save more.'
                 : 'You can spend ' + spendTxt + ' every year' + (infl ? ', rising with inflation' : '') + '.') + '</p>' +
-            todayNote +
+            (byAll ? '' : todayNote) +
             (mc ? '<p class="hero-mc">🎲 <strong>' + Math.round(mc.successRate * 100) + '%</strong> of ' + mc.trials + ' simulated markets fund the plan.</p>' : '') +
+            judgeHtml +
             '<div class="stat-grid">' +
             '<div class="stat-card"><span class="stat-number">' + fmtCompact(sumRows('taxPaid')) + '</span><div class="stat-label">Total income tax</div></div>' +
             '<div class="stat-card"><span class="stat-number">' + (sumRows('clawback') > 0 ? fmtCompact(sumRows('clawback')) : 'None') + '</span><div class="stat-label">OAS paid back</div></div>' +
