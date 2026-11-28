@@ -37,6 +37,9 @@ If something breaks (red check, wrong result, no access): `docs/if-something-bre
 - Test the gate: `python3 scripts/test_account.py` (stubbed server, needs `pip install playwright`). CI runs it.
 - Saved plans table: `migration/planner_profiles.sql` (run once via the Supabase AI prompt in the README).
 
+## Words to keep the same everywhere
+- **Everyday spending** is the one name for the normal day-to-day spending target (Step 2 field `spendAmountLabel` and its JS text, year-card lines "Everyday spending", "Goes to everyday spending"). Special, year-specific costs are Life events, never "spending" or "living costs". Do not reintroduce "living costs", "General living costs" or "Spending you want". If you rename it, change the English text, the info note under the field, the French entries (Quebec `EXACT` and `P.push`), the guide and the glossary row together; `scripts/test_home_sale.py` checks the label and the year cards.
+
 ## Where things are (grep the name)
 - Tax rules: `getDefaultTaxRules`, `getTaxRules`, `validateTaxRulesShape`; engine `calculateTax`;
   withholding `calcWithholdingTax`; LIF/RRIF `rrifMinFactor`, `federalLifMaxPct`.
