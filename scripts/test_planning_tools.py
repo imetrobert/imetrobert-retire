@@ -123,6 +123,10 @@ with sync_playwright() as pw:
         const d = document.getElementById('yp-' + m[1]); return {found: !!d, open: !!(d && d.open)}; })()""")
     check(tap is not None and tap['found'] and tap['open'], 'bar tap: expected the year card to open, got %s' % tap)
 
+    # 6c0. headline has a status icon (tick, X or !)
+    ico = pg.evaluate("(() => { const i = document.querySelector('.hero h2.hero-h svg.hero-ico'); return i ? i.getAttribute('aria-label') : null; })()")
+    check(ico in ('Money lasts', 'Money runs out', 'Some risk'), 'headline icon missing: %s' % ico)
+
     # 6c. results headline colour: green when the money lasts, red when it runs out
     hcol = pg.evaluate("(() => { const h = document.querySelector('.hero h2.hero-h'); return h ? [h.className, getComputedStyle(h).color] : null; })()")
     check(hcol is not None, 'headline colour: hero headline has no hero-h class')
