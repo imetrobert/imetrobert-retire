@@ -501,6 +501,7 @@ details.tipbox>div{padding:0 12px 12px;font-size:14px;color:#1e293b}
 .yp-main small{display:block;color:#64748b;font-size:13px;margin-top:2px}
 .yp-chev{color:#94a3b8;font-size:20px;transition:transform .15s}
 .yp[open] .yp-chev{transform:rotate(90deg)}
+.yp-flash{outline:3px solid #2563eb;outline-offset:2px;border-radius:10px;transition:outline-color .4s}.wd-hit:hover{fill:rgba(37,99,235,.08)}
 .yp-body{padding:0 14px 14px;border-top:1px solid #f1f5f9}
 .yp-step{margin-top:14px}
 .yp-step h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:14px;color:#0f172a}
@@ -5616,6 +5617,16 @@ The numbers in that example are placeholders from a prior year — replace every
         if (b) b.classList.toggle('active', v === 'table');
     }
 
+    // Tap a bar in the withdrawal chart: show the year cards, open that year and scroll to it.
+    function goToYear(age) {
+        if (scheduleView === 'table') setScheduleView('cards');
+        const el = document.getElementById('yp-' + age);
+        if (!el) return;
+        el.open = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('yp-flash'); setTimeout(() => el.classList.remove('yp-flash'), 1600);
+    }
+
     function fmtCompact(n) {
         const a = Math.abs(n), sign = n < 0 ? '-' : '';
         if (a >= 1e6) return sign + '$' + (a / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
@@ -5886,7 +5897,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const perMo = fmtNum((r.actualNetTakeHome) / 12);
             const headline = deficit ? 'Short: only ' + perMo + '/mo' : 'Take out ' + fmtCompact(withdrawn);
             const sub = deficit ? 'Target not fully met' : 'To spend ' + perMo + '/mo' + (has(taxBill) ? ' · tax ' + fmtCompact(taxBill) : '') + (moveTot > 1 ? ' · move ' + fmtCompact(moveTot) : '');
-            return '<details class="yp' + (deficit ? ' deficit' : '') + '"><summary>' +
+            return '<details class="yp' + (deficit ? ' deficit' : '') + '" id="yp-' + Math.round(r.age) + '"><summary>' +
                 '<span class="yp-age">' + ((p && p.currentAge > 0) ? '<small class="yp-yr">' + (new Date().getFullYear() + Math.round(r.age - p.currentAge)) + '</small>' : '') + r.age + '<small>age</small><em class="yp-rate ' + (r.rate > 0.00005 ? 'up' : r.rate < -0.00005 ? 'down' : '') + '">' + (r.rate > 0 ? '+' : '') + (r.rate * 100).toFixed(1) + '%</em><small>growth</small></span>' +
                 '<span class="yp-main"><b>' + headline + '</b><small>' + sub + '</small></span>' +
                 '<span class="yp-chev">›</span></summary><div class="yp-body">' + body + '</div></details>';
@@ -5922,7 +5933,8 @@ The numbers in that example are placeholders from a prior year — replace every
                 yBase -= hh;
                 bars += '<rect x="' + x + '" y="' + yBase.toFixed(1) + '" width="' + BW + '" height="' + hh.toFixed(1) + '" fill="' + WD_COLORS[a[0]] + '"><title>' + a[1] + ': ' + fmtNum(v) + '</title></rect>';
             });
-            bars += '<text class="wd-total" x="' + (x + BW / 2) + '" y="' + (yBase - 5).toFixed(1) + '" font-size="10" font-weight="700" fill="#1e293b" text-anchor="middle">' + (totals[i] > 0 ? fmtCompact(totals[i]) : '–') + '</text>' +
+            bars += '<rect class="wd-hit" x="' + (x - GAP / 2) + '" y="0" width="' + (BW + GAP) + '" height="' + H + '" fill="transparent" style="cursor:pointer" role="button" tabindex="0" aria-label="Age ' + r.age + ': show the details" onclick="goToYear(' + Math.round(r.age) + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();goToYear(' + Math.round(r.age) + ')}"/>' +
+                '<text class="wd-total" x="' + (x + BW / 2) + '" y="' + (yBase - 5).toFixed(1) + '" font-size="10" font-weight="700" fill="#1e293b" text-anchor="middle">' + (totals[i] > 0 ? fmtCompact(totals[i]) : '–') + '</text>' +
                 '<text x="' + (x + BW / 2) + '" y="' + (H - 7) + '" font-size="10" fill="#64748b" text-anchor="middle">' + r.age + '</text>';
         });
         marks.forEach((m, k) => {
@@ -5934,7 +5946,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const legend = used.map(a => '<span class="wd-key"><i style="background:' + WD_COLORS[a[0]] + '"></i><span>' + a[1] + '</span></span>').join('');
         return '<div class="wd-chart"><div class="wd-scroll"><svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Withdrawals by account for each year of the plan, ages ' + list[0].age + ' to ' + list[n - 1].age + '">' +
             '<line x1="0" y1="' + (H - padB) + '" x2="' + W + '" y2="' + (H - padB) + '" stroke="#cbd5e1"/>' + bars + '</svg></div>' +
-            '<div class="wd-legend">' + legend + '</div><div class="ps-note">Each bar is one year (the age is under it): what you take out, by account. The amount above each bar is the total for that year. Swipe sideways to see every year.</div>' + (marks.length ? '<div class="ps-note">The solid lines show when QPP and OAS start: after that, these pensions pay part of your spending, so your accounts pay less.</div>' : '') + '</div>';
+            '<div class="wd-legend">' + legend + '</div><div class="ps-note">Each bar is one year (the age is under it): what you take out, by account. The amount above each bar is the total for that year. Tap a bar to jump to that year’s details. Swipe sideways to see every year.</div>' + (marks.length ? '<div class="ps-note">The solid lines show when QPP and OAS start: after that, these pensions pay part of your spending, so your accounts pay less.</div>' : '') + '</div>';
     }
 
     // Plain-words summary of the plan at the top of the results (accounts used by age range, TFSA, government pensions).
