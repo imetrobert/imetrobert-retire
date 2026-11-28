@@ -68,7 +68,7 @@ with sync_playwright() as pw:
     # "Judge the plan by": badge follows this run (default) or the share of the 300 markets that fund the plan
     pg.evaluate("document.getElementById('mcRepeatable').checked = true; mcRerunN = 0; mcSeedShift = 0; calculateRetirementPlan()")
     def hero():
-        return pg.evaluate("(() => ({badge: document.querySelector('#heroSummary .hero-badge').innerText, h2: document.querySelector('#heroSummary h2').innerText, on: (document.querySelector('.mc-judge button.on')||{}).innerText}))()")
+        return pg.evaluate("(() => ({badge: (document.querySelector('#heroSummary .hero-badge')||{innerText: ''}).innerText, h2: document.querySelector('#heroSummary h2').innerText, on: (document.querySelector('.mc-judge button.on')||{}).innerText}))()")
     h0 = hero()
     check(h0['on'] and h0['on'].strip().lower() in ('this run', 'cette simulation'), 'default judge should be This run: %r' % h0)
     pct = pg.evaluate("Math.round(lastAuditMeta.monteCarlo.successRate * 100)")
@@ -76,8 +76,12 @@ with sync_playwright() as pw:
     pg.click('.mc-judge button:nth-of-type(2)')
     h1 = hero()
     check(('%d' % pct) in h1['h2'] and 'market' in h1['h2'].lower() or 'march' in h1['h2'].lower(), 'all-markets headline should show %d%%: %r' % (pct, h1))
-    want = {'ok': ('You are on track', 'Sur la bonne voie'), 'risk': ('Some risk', 'Risque mod'), 'short': ('Needs a change', 'Changement')}[lvl]
-    check(pg.evaluate("document.querySelector('#heroSummary .hero').classList.contains('short')") == (lvl != 'ok'), 'badge colour should match level %s at %d%%' % (lvl, pct))
+    # all-markets view is neutral: no badge, no tick or X, black headline, advice about risk
+    check(h1['badge'] == '', 'all-markets view must show no verdict badge, got %r' % h1['badge'])
+    check(pg.evaluate("document.querySelectorAll('#heroSummary .hero-ico').length") == 0, 'all-markets view must show no tick or X')
+    check(pg.evaluate("getComputedStyle(document.querySelector('#heroSummary h2.hero-h')).color") == 'rgb(17, 24, 39)', 'all-markets headline should be neutral black')
+    check(pg.evaluate("!!document.querySelector('#heroSummary .hero-advice')"), 'all-markets view should show the risk advice')
+    check(not pg.evaluate("document.querySelector('#heroSummary .hero').classList.contains('short')"), 'all-markets hero should not use the warning style')
     pg.click('#mcRunBanner .mc-rerun')
     check(pg.evaluate("(document.querySelector('.mc-judge button.on')||{}).innerText").strip().lower() in ('all markets', 'tous les march\u00e9s'), 'choice should stay on All markets after a re-run')
     pg.click('.mc-judge button:nth-of-type(1)')

@@ -270,7 +270,7 @@ EDIT SAFELY: change wording in the HTML only for labels; do not rename element i
         .hero h2 { color: #fff; font-size: 1.4rem; margin: 0.65rem 0 0.2rem; }
 .hero h2.hero-h { display: inline-flex; align-items: center; gap: .6rem; background: #fff; padding: 0.2rem 0.7rem; border-radius: 10px; }
         .hero-ico { flex: none; width: 2.6rem; height: 2.6rem; }
-        .hero h2.hero-h.ok { color: #15803d; } .hero h2.hero-h.risk { color: #b45309; } .hero h2.hero-h.short { color: #b91c1c; }
+        .hero h2.hero-h.all { color: #111827; } .hero h2.hero-h.ok { color: #15803d; } .hero h2.hero-h.risk { color: #b45309; } .hero h2.hero-h.short { color: #b91c1c; }
         .hero p { margin: 0; font-size: 0.88rem; opacity: 0.95; }
         .hero-mc { margin-top: 0.6rem !important; font-size: 0.82rem !important; background: rgba(255,255,255,0.16); border-radius: 10px; padding: 0.45rem 0.7rem; }
         .mc-judge { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.5rem; font-size: 0.78rem; }
@@ -5722,6 +5722,7 @@ The numbers in that example are placeholders from a prior year — replace every
 
     // Big status mark beside the headline: green tick (money lasts), red X (runs out), amber ! (some risk).
     function heroIcon(level) {
+        if (level === 'all') return '';
         const c = level === 'ok' ? '#15803d' : level === 'short' ? '#b91c1c' : '#b45309';
         const d = level === 'ok' ? 'M13 24.5l7 7 15-16' : level === 'short' ? 'M15 15l18 18M33 15L15 33' : 'M24 13v14M24 34v2';
         const lab = level === 'ok' ? 'Money lasts' : level === 'short' ? 'Money runs out' : 'Some risk';
@@ -6155,16 +6156,17 @@ The numbers in that example are placeholders from a prior year — replace every
         const judgeOn = !!mc && !p.hhRole;
         const byAll = judgeOn && mcJudge === 'all';
         const pctAll = mc ? Math.round(mc.successRate * 100) : 0;
-        const level = byAll ? (pctAll >= 90 ? 'ok' : (pctAll >= 70 ? 'risk' : 'short')) : (short ? 'short' : 'ok');
+        const level = byAll ? 'all' : (short ? 'short' : 'ok');
         const badgeTxt = level === 'ok' ? 'You are on track' : (level === 'risk' ? 'Some risk' : 'Needs a change');
+        // All-markets view is neutral on purpose: no verdict, tick or X; the person judges it against their own risk tolerance.
         const judgeHtml = judgeOn ? '<div class="mc-judge"><span>Judge the plan by</span>' +
             '<button type="button" class="' + (byAll ? '' : 'on') + '" onclick="mcSetJudge(\'run\')">This run</button>' +
             '<button type="button" class="' + (byAll ? 'on' : '') + '" onclick="mcSetJudge(\'all\')">All markets</button></div>' : '';
         hero.innerHTML =
-            '<div class="hero' + (level !== 'ok' ? ' short' : '') + '">' +
-            '<span class="hero-badge">' + badgeTxt + '</span>' +
+            '<div class="hero' + (level !== 'ok' && level !== 'all' ? ' short' : '') + '">' +
+            (byAll ? '' : '<span class="hero-badge">' + badgeTxt + '</span>') +
             '<h2 class="hero-h ' + level + '">' + heroIcon(level) + '<span>' + (byAll ? 'Your plan works in ' + pctAll + '% of markets' : short ? 'Money runs out at age ' + shortfall.age : 'Your money lasts to age ' + p.lifeExpectancy) + '</span></h2>' +
-            '<p>' + (byAll ? 'Judged across all ' + mc.trials + ' simulated markets, not just this run.' : short
+            '<p>' + (byAll ? 'Judged across all ' + mc.trials + ' simulated markets, not just this run.</p><p class="hero-advice">As a guide, under 70% is high risk and 90% or more is comfortable. What is right for you depends on how much risk you are comfortable with.' : short
                 ? 'Your ' + spendTxt + ' target can’t be fully met from age ' + shortfall.age + ' (take-home drops to ' + fmtNum(shortfall.actualNetTakeHome) + ' a year). You could spend a little less, retire later, or save more.'
                 : 'You can spend ' + spendTxt + ' every year' + (infl ? ', rising with inflation' : '') + '.') + '</p>' +
             (byAll ? '' : todayNote) +
