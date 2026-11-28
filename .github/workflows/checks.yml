@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
     paths: ['index.html', 'account.js', 'statements.js', 'vendor/**', 'tests/**', 'scripts/**']
+  pull_request:
+    paths: ['index.html', 'account.js', 'statements.js', 'vendor/**', 'tests/**', 'scripts/**', '.github/workflows/**']
 permissions:
   contents: write
 jobs:
@@ -36,6 +38,7 @@ jobs:
       - name: Refresh the code map
         run: python3 scripts/code_map.py
       - name: Commit the code map if it changed
+        if: github.event_name != 'pull_request'
         run: |
           if [ -n "$(git status --porcelain docs/code-map.md)" ]; then
             git config user.name "github-actions"
