@@ -268,6 +268,8 @@ EDIT SAFELY: change wording in the HTML only for labels; do not rename element i
         .hero-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.85rem; border-radius: 999px; background: rgba(255,255,255,0.95); color: #047857; }
         .hero.short .hero-badge { background: var(--amber); color: #1e293b; }
         .hero h2 { color: #fff; font-size: 1.4rem; margin: 0.65rem 0 0.2rem; }
+.hero h2.hero-h { display: inline-block; background: #fff; padding: 0.2rem 0.7rem; border-radius: 10px; }
+        .hero h2.hero-h.ok { color: #15803d; } .hero h2.hero-h.risk { color: #b45309; } .hero h2.hero-h.short { color: #b91c1c; }
         .hero p { margin: 0; font-size: 0.88rem; opacity: 0.95; }
         .hero-mc { margin-top: 0.6rem !important; font-size: 0.82rem !important; background: rgba(255,255,255,0.16); border-radius: 10px; padding: 0.45rem 0.7rem; }
         .mc-judge { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.5rem; font-size: 0.78rem; }
@@ -6035,7 +6037,7 @@ The numbers in that example are placeholders from a prior year — replace every
         hero.innerHTML =
             '<div class="hero' + (level !== 'ok' ? ' short' : '') + '">' +
             '<span class="hero-badge">' + badgeTxt + '</span>' +
-            '<h2>' + (byAll ? 'Your plan works in ' + pctAll + '% of markets' : short ? 'Money runs out at age ' + shortfall.age : 'Your money lasts to age ' + p.lifeExpectancy) + '</h2>' +
+            '<h2 class="hero-h ' + level + '">' + (byAll ? 'Your plan works in ' + pctAll + '% of markets' : short ? 'Money runs out at age ' + shortfall.age : 'Your money lasts to age ' + p.lifeExpectancy) + '</h2>' +
             '<p>' + (byAll ? 'Judged across all ' + mc.trials + ' simulated markets, not just this run.' : short
                 ? 'Your ' + spendTxt + ' target can’t be fully met from age ' + shortfall.age + ' (take-home drops to ' + fmtNum(shortfall.actualNetTakeHome) + ' a year). You could spend a little less, retire later, or save more.'
                 : 'You can spend ' + spendTxt + ' every year' + (infl ? ', rising with inflation' : '') + '.') + '</p>' +
