@@ -42,7 +42,7 @@
       wrong: 'That email or password is not right.', noaccess: 'This account does not have access to this planner. Ask Robert to grant it.',
       offline: 'Cannot reach the sign-in service. Check your connection and try again.', revoked: 'Your session ended. Please sign in again.',
       error: 'Something went wrong. Please try again in a moment.', checking: 'Checking your access…', loadFail: 'Could not load sign-in. Check your connection and reload.',
-      myPlans: 'My plans (cloud)', menuCloud: 'Save / load scenarios in the cloud', close: 'Close', signedInAs: 'Signed in as',
+      myPlans: 'Cloud copies', menuCloud: 'Save / load scenarios in the cloud', close: 'Close', signedInAs: 'Signed in as',
       saveH: 'Save this plan to my account', saveHelp: 'Your plan is encrypted on this device before it is saved to your account, so you can open it on any device. (Save / load scenarios on this device keeps copies in this browser only.) Only your passphrase can open it, and it cannot be recovered if forgotten.',
       first: 'First time: choose a passphrase of at least 10 characters (a few words works well). You will need it on every device.',
       pass: 'Passphrase', pass2: 'Repeat the passphrase', unlock: 'Unlock my plans', saveBtn: 'Save this plan', lock: 'Lock', remember: 'Remember the passphrase on this device',
@@ -52,7 +52,7 @@
       badPass: 'Wrong passphrase, or a saved plan was damaged.', working: 'Working…', saved: 'Saved to your account.', unlocked: 'Unlocked.',
       deleted: 'Deleted.', opened: 'Plan opened in the form.', confirmDel: 'Delete this saved plan? This cannot be undone.',
       noCrypto: 'This browser cannot encrypt here. Open the page over https in a current browser.', saveFail: 'Could not save. Check your connection and try again.',
-      soTitle: 'Sign out', soText: 'Your Saved on this device copies and the plan in the form can stay on this phone, or be removed. Plans in My plans (cloud) are never affected.', soSure: 'Tap again to delete the device copies', soKeep: 'Sign out, keep device plans', soClear: 'Sign out and clear device plans', cancel: 'Cancel',
+      soTitle: 'Sign out', soText: 'Your Saved on this device copies and the plan in the form can stay on this phone, or be removed. Cloud copies are never affected.', soSure: 'Tap again to delete the device copies', soKeep: 'Sign out, keep device plans', soClear: 'Sign out and clear device plans', cancel: 'Cancel',
       welcome: 'Welcome {email} to your retirement planner', docsLink: 'Read the documentation',
       loggedIn: 'Logged in as {email}', docsMenu: 'Documentation', docsSub: 'User guide (PDF)', plansSub: 'Save and open your scenarios on any device with your passphrase',
       lang: 'Français'
@@ -64,7 +64,7 @@
       wrong: 'Ce courriel ou ce mot de passe n’est pas correct.', noaccess: 'Ce compte n’a pas accès à ce planificateur. Demandez à Robert de l’autoriser.',
       offline: 'Impossible de joindre le service de connexion. Vérifiez votre connexion et réessayez.', revoked: 'Votre session est terminée. Veuillez vous reconnecter.',
       error: 'Une erreur est survenue. Réessayez dans un instant.', checking: 'Vérification de votre accès…', loadFail: 'Impossible de charger la connexion. Vérifiez votre connexion et rechargez la page.',
-      myPlans: 'Mes plans (nuage)', close: 'Fermer', signedInAs: 'Connecté en tant que',
+      myPlans: 'Copies dans le nuage', close: 'Fermer', signedInAs: 'Connecté en tant que',
       saveH: 'Enregistrer ce plan dans mon compte', saveHelp: 'Votre plan est chiffré sur cet appareil avant d’être enregistré dans votre compte, et vous pouvez l’ouvrir sur tout appareil. (L’élément de menu Enregistrés sur cet appareil conserve des copies dans ce navigateur seulement.) Seule votre phrase secrète peut l’ouvrir, et elle ne peut pas être récupérée si elle est oubliée.',
       first: 'Première fois : choisissez une phrase secrète d’au moins 10 caractères (quelques mots suffisent). Vous en aurez besoin sur chaque appareil.',
       pass: 'Phrase secrète', pass2: 'Répétez la phrase secrète', unlock: 'Déverrouiller mes plans', saveBtn: 'Enregistrer ce plan', lock: 'Verrouiller', remember: 'Retenir la phrase secrète sur cet appareil',
@@ -74,7 +74,7 @@
       badPass: 'Phrase secrète incorrecte, ou un plan enregistré est endommagé.', working: 'En cours…', saved: 'Enregistré dans votre compte.', unlocked: 'Déverrouillé.',
       deleted: 'Supprimé.', opened: 'Plan ouvert dans le formulaire.', confirmDel: 'Supprimer ce plan enregistré ? Cette action est irréversible.',
       noCrypto: 'Ce navigateur ne peut pas chiffrer ici. Ouvrez la page en https dans un navigateur récent.', saveFail: 'Enregistrement impossible. Vérifiez votre connexion et réessayez.',
-      soTitle: 'Se déconnecter', soText: 'Vos copies Enregistrées sur cet appareil et le plan du formulaire peuvent rester sur ce téléphone, ou être supprimés. Les plans de Mes plans (nuage) ne sont jamais touchés.', soSure: 'Touchez encore pour supprimer les copies de l’appareil', soKeep: 'Se déconnecter, garder les plans de l’appareil', soClear: 'Se déconnecter et effacer les plans de l’appareil', cancel: 'Annuler',
+      soTitle: 'Se déconnecter', soText: 'Vos copies Enregistrées sur cet appareil et le plan du formulaire peuvent rester sur ce téléphone, ou être supprimés. Les copies dans le nuage ne sont jamais touchées.', soSure: 'Touchez encore pour supprimer les copies de l’appareil', soKeep: 'Se déconnecter, garder les plans de l’appareil', soClear: 'Se déconnecter et effacer les plans de l’appareil', cancel: 'Annuler',
       welcome: 'Bienvenue {email} dans votre planificateur de retraite', docsLink: 'Lire la documentation',
       loggedIn: 'Connecté en tant que {email}', docsMenu: 'Documentation', docsSub: 'Guide de l’utilisateur (PDF)', plansSub: 'Chiffrés dans votre compte, accessibles sur tout appareil',
       lang: 'English'
@@ -249,6 +249,8 @@
     });
   };
   window.awrResetPlan = function () { V.planId = null; };
+  window.awrOpenCloud = function () { openPanel(); };
+  window.awrCloudRows = function () { return autoUnlock().then(function (ok) { return ok ? (V.rows || []) : null; }, function () { return null; }); };
   function deleteRow(rowId) {
     return token().then(function (tk) { return call('DELETE', '/rest/v1/planner_profiles?id=eq.' + encodeURIComponent(rowId), null, tk); })
       .then(function (r) { if (!r.ok) throw new Error('server'); });
@@ -316,20 +318,6 @@
         body.appendChild(b);
         return;
       }
-      body.appendChild(el('h3', {}, [t('saveH')]));
-      var sb = el('button', { class: 'awr-btn', type: 'button', onclick: function () {
-        var ex = V.planId && (V.rows || []).filter(function (r) { return r.p && r.p.id === V.planId; })[0];
-        if (ex && window.askSaveChoice) {
-          window.askSaveChoice((ex.p && ex.p.name) || t('unnamed'), function (mode, nm) { if (!mode) return; if (mode === 'new' && window.saveDetach) window.saveDetach(nm); doSave(); });
-        } else doSave();
-        function doSave() {
-        sb.disabled = true; say(msg, t('working'));
-        savePlan().then(function () { return listRows(); }).then(function (raw) { V.rawRows = raw; return unlockWith(V.pass, raw); }).then(function (rows) {
-          V.rows = rows; V.haveRows = rows.length > 0; if (rows.length && !V.salt) V.salt = unb64(JSON.parse(rows[0].blob).salt); say(msg, t('saved'), 'good'); render();
-        }).catch(function () { say(msg, t('saveFail'), 'bad'); render(); });
-        }
-      } }, [t('saveBtn')]);
-      body.appendChild(sb);
       body.appendChild(el('h3', {}, [t('listH')]));
       if (!V.rows.length) body.appendChild(el('p', {}, [t('none')]));
       V.rows.forEach(function (r) {
@@ -359,6 +347,7 @@
   function openPlan(p) {
     if (typeof populateForm !== 'function') return;
     V.planId = p.id || null;
+    try { if (window.planAdopt) window.planAdopt(p); } catch (e) {}
     populateForm(p);
     try { localStorage.setItem(CFG.profileKey, JSON.stringify(p)); } catch (e) {}
     if (typeof showSaveBadge === 'function') showSaveBadge(t('opened'));
@@ -399,9 +388,6 @@
       return el(tag, a, [el('span', { class: 'mi-ico' }, [ico]), el('span', {}, [label, el('small', {}, [sub])])]);
     }
     ['awr-mi-plans', 'awr-mi-docs', 'awr-mi-out'].forEach(function (i) { var o = document.getElementById(i); if (o) o.remove(); });
-    var cloud = mk('button', 'awr-mi-plans', '☁', t('menuCloud'), t('plansSub'), { type: 'button', onclick: function () { if (typeof closeMenu === 'function') closeMenu(); openPanel(); } });
-    var dev = m.querySelector('[onclick*="showProfileManager"]');
-    if (dev && dev.parentNode === m) dev.insertAdjacentElement('afterend', cloud); else m.appendChild(cloud);
     if (CFG.docs) m.appendChild(mk('a', 'awr-mi-docs', '📖', t('docsMenu'), t('docsSub'), { href: CFG.docs, target: '_blank', rel: 'noopener', style: 'text-decoration:none;color:inherit' }));
     m.appendChild(mk('button', 'awr-mi-out', '⎋', t('signOut'), (S.sess && S.sess.email) || '', { type: 'button', onclick: function () { if (typeof closeMenu === 'function') closeMenu(); signOutDialog(); } }));
   }
@@ -413,7 +399,7 @@
     refreshMenu();
   }
   function unlocked() {
-    removeLock(); welcome(); hookMenu();
+    removeLock(); window.awrCloudReady = true; welcome(); hookMenu();
   }
 
   /* ---------- start ---------- */
