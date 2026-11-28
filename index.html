@@ -12,6 +12,7 @@ TAX ENGINE: calculateTax = federal tax less credits x (1-16.5% Quebec abatement)
 ROW FIELDS (scheduleRows): age, rrspDraw, liraDraw, rlifUnlockedDraw, nonRegDraw, ftqDraw, tfsaDraw, qppInc, oasIncGross, pensionInc, otherInc, clawback, taxPaid, withholdingTax, actualNetTakeHome, reinvested, tfsaContribution, rlifTransferThisYear, sim* balances, purposes{rrsp,rlif,lira,nonReg,ftq,tfsa -> income,event,tax,transfer}.
 HOUSEHOLD (couple) MODE: the planner form is filled in once per person (HH state, hhSwitch); each person runs runSimulation alone on their share of household spending (hhPlanProfiles); results merge in hhRenderHouse. Blocks to grep: '// ---- Household mode', '// ---- Pension income splitting' (hhSplitPensions: moves income between spouses via p.hhTaxAdj), '// ---- Spousal rollover' (hhRollover: first death passes savings to the survivor via p.hhSurv), '// ---- Optional expense list' (EXP, expSync). Old 'couple' calcMode in runSimulation still splits income 50/50 for legacy plans. Extra row fields: splitBase, splitElig, splitAdj. Each expense row and life event has linked % boxes (you / spouse or others, 100% total; hhExpPctInput, hhEnsureEventPct, evMine) and rows have their own Monthly/Weekly/Yearly (freqMult); hhOptimizeSplit and hhOptimizeEvents recommend splits. Recipes: docs/common-edits.md 13 and 14. Tests: scripts/test_household.py, test_expenses.py, test_tax.py.
 CHECK: money in (draws + qpp + oas + pensionInc + otherInc) = actualNetTakeHome + taxPaid + clawback + reinvested, every year.
+HOME SALE (optional, per person): Step 1 question homeSaleDecl -> Step 2 card homeSaleCard; block '// ---- Optional sale of the family home' (hsNetProceeds, hsCostDelta, hsUi); engine adds the net money to the TFSA (up to room) / non-registered in runSimulation (hsNet) and changes yearly spending from the sale year (hsCostDelta); recipe 18 in docs/common-edits.md.
 OTHER INCOME (optional, per person): Step 1 question otherIncDecl -> Step 2 card otherIncCard (one yearly otherIncAmt, or a year-by-year list otherIncList built from the ages); block '// ---- Optional other income in retirement'; runSimulation adds otherIncY to totalPublicPens (taxable, NOT pension income); row field otherInc. Recipe 15 in docs/common-edits.md. Test: scripts/test_other_income.py.
 COMPARE AND STRESS-TEST TOOLS (v1.4 code, added here): one block, '// COMPARE AND STRESS-TEST TOOLS' (ptStartAges, ptStrategies, ptStress, ptEstate, ptCompareSaved/ptFillSaved, ptOnePage, cycleTextSize, ptAddPreset). They only call runSimulation with changed copies of the plan; engine change: customSeqType 'bear_severe'. Results fold 'Compare and stress-test', Save or share 'One-page summary', Saved screen 'Compare two scenarios', Menu 'Text size', Life events 'Add a common event'. Recipe 16 in docs/common-edits.md. Test: scripts/test_planning_tools.py.
 UI HELPERS: long .note-text blocks become 'Why this matters' buttons that open a bottom sheet (showInfo/initInfoNotes). Collapsible account cards = .asset-row (initCollapsibles). Optional settings sit in <details class=more>.
@@ -606,6 +607,14 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
             </select>
             <span class="note-text">If yes, a card appears in Step 2. QPP, OAS and employer pensions have their own cards.</span>
 
+            <label for="homeSaleDecl">Do you plan to sell your home during retirement?</label>
+            <select id="homeSaleDecl" onchange="hsUi(true)">
+                <option value="no">No</option>
+                <option value="downsize">Yes, and move to a smaller home</option>
+                <option value="rent">Yes, and rent instead</option>
+            </select>
+            <span class="note-text">If yes, a card appears in Step 2. The money from selling your main home is not taxed. The planner invests what is left in the account you choose. As a couple, answer on one person's form only.</span>
+
             <div id="spouseBlock" class="spouse-section">
                 <label for="spouseAge">Your spouse's age today</label>
                 <input type="number" id="spouseAge" value="55" min="18" max="90">
@@ -893,6 +902,38 @@ details.resultnote:has(#deficitReportBanner:empty):has(#mcReportBanner:empty){di
                     <option value="today">Today's dollars (plus inflation)</option>
                     <option value="year">Dollars of each year (no inflation)</option>
                 </select>
+            </div>
+
+            <div class="asset-row" id="homeSaleCard" style="display:none;">
+                <h4>Selling your home</h4>
+                <label for="homeSaleAge">Age when you sell</label>
+                <input type="number" id="homeSaleAge" value="75" min="40" max="110" oninput="hsUi()">
+                <label for="homeSalePrice">Expected sale price, in today's dollars ($)</label>
+                <input type="number" id="homeSalePrice" value="700000" min="0" step="10000" oninput="hsUi()">
+                <label for="homeSaleCostPct">Selling costs (% of the price)</label>
+                <input type="number" id="homeSaleCostPct" value="5" min="0" max="20" step="0.5" oninput="hsUi()">
+                <span class="note-text">Agent, legal and notary fees. About 5% is common.</span>
+                <label for="homeSaleOwing">Mortgage or loans paid off at the sale ($)</label>
+                <input type="number" id="homeSaleOwing" value="0" min="0" step="5000" oninput="hsUi()">
+                <div id="hsDownRows">
+                    <label for="homeSaleNewPrice">Price of the smaller home, in today's dollars ($)</label>
+                    <input type="number" id="homeSaleNewPrice" value="450000" min="0" step="10000" oninput="hsUi()">
+                    <label for="homeSaleBuyPct">Buying and moving costs (% of that price)</label>
+                    <input type="number" id="homeSaleBuyPct" value="3" min="0" max="20" step="0.5" oninput="hsUi()">
+                </div>
+                <label for="homeSaleSaved">Yearly housing costs you stop paying, in today's dollars ($)</label>
+                <input type="number" id="homeSaleSaved" value="0" min="0" step="500" oninput="hsUi()">
+                <span class="note-text">Property tax, upkeep, insurance and utilities of the home you sell, if they are part of your spending.</span>
+                <label for="homeSaleNewCost">Yearly cost of your new housing, in today's dollars ($)</label>
+                <input type="number" id="homeSaleNewCost" value="0" min="0" step="500" oninput="hsUi()">
+                <span class="note-text">Rent for a rental, or property tax and upkeep of the smaller home.</span>
+                <label for="homeSaleDest">Where the money goes</label>
+                <select id="homeSaleDest" onchange="hsUi()">
+                    <option value="tfsa">TFSA first (up to your unused room), the rest in non-registered</option>
+                    <option value="nonreg">All in my non-registered account</option>
+                </select>
+                <span class="note-text">A TFSA grows tax-free but only takes what your room allows. Money in a non-registered account is taxed each year on its income and gains.</span>
+                <div class="note-text" id="hsPreview"></div>
             </div>
 
             <div id="spouseAssetBlock" class="spouse-section">
@@ -2696,6 +2737,7 @@ The numbers in that example are placeholders from a prior year — replace every
         updateSpendFrequencyLabel();
         expLoad(p);
         oiLoad(p);
+        hsLoad(p);
 
         document.getElementById('currentRrsp').value = p.currentRrsp ?? 250000;
         document.getElementById('contribRrsp').value = p.contribRrsp ?? 5000;
@@ -3240,6 +3282,7 @@ The numbers in that example are placeholders from a prior year — replace every
             spendAmount: expState().on ? expSpend(EXP.items, EXP.freq) : (parseFloat(document.getElementById('spendAmount').value) || 0),
             otherIncOn: oiDeclared(), otherIncAmt: Math.max(0, parseFloat(document.getElementById('otherIncAmt').value) || 0), otherIncBasis: document.getElementById('otherIncBasis').value,
             otherIncListOn: OI.on, otherIncList: Object.assign({}, OI.list),
+            ...hsProfile(),
             expenseOn: expState().on, expenseFreq: EXP.freq, expenseItems: EXP.items.map(i => ({ name: i.name, amount: i.amount, freq: i.freq, pct: (i.pct === undefined ? null : i.pct) })),
 
             currentRrsp: parseFloat(document.getElementById('currentRrsp').value) || 0,
@@ -3785,7 +3828,7 @@ The numbers in that example are placeholders from a prior year — replace every
         r.qcBrackets = sb(rules.qcBrackets);
         return r;
     }
-    const MONEY_FIELDS = ['splitAdj', 'rrspDraw', 'simRrsp', 'liraDraw', 'simLira', 'nonRegDraw', 'simNonReg', 'ftqDraw', 'simFtq', 'tfsaDraw', 'simTfsa',
+    const MONEY_FIELDS = ['splitAdj', 'rrspDraw', 'simRrsp', 'liraDraw', 'simLira', 'homeSaleNet', 'homeSaleTfsa', 'homeSaleNon', 'nonRegDraw', 'simNonReg', 'ftqDraw', 'simFtq', 'tfsaDraw', 'simTfsa',
         'rlifTransferThisYear', 'oRrsp', 'oRlif', 'oLira', 'oBell', 'oNon', 'oFtq', 'oTfsa', 'ulBellBefore', 'ulOtherBefore', 'ulFromBell', 'ulFromOther', 'rlifUnlockedDraw', 'simRlifUnlocked', 'qppInc', 'oasIncGross', 'oasIncNet', 'pensionInc', 'otherInc', 'bellDraw', 'simBellBal', 'clawback', 'taxPaid',
         'withholdingTax', 'whtRrsp', 'whtRlif', 'whtLira', 'whtFtq', 'actualNetTakeHome', 'reinvested', 'nonRegYieldIncome', 'extraRegWithdrawal', 'eventTotalThisYear', 'targetSpend', 'tfsaContribution', 'tfsaAnnualLimit', 'tfsaRoomLeft', 'nonRegCostBase'];
 
@@ -4103,7 +4146,7 @@ The numbers in that example are placeholders from a prior year — replace every
             const idxY = idxAtAge(currentAgeSim);                 // price level vs today
             const infY = infRateAtAge(currentAgeSim);             // this year's inflation
             const taxRules = scaleTaxRules(taxRulesBase, idxY);   // brackets/credits indexed to this year
-            const annualNetNeedY = ((p.hhSurv && yr >= p.hhSurv.yr) ? p.hhSurv.need : annualNetNeed) * idxY;          // spending target in this year's dollars
+            const annualNetNeedY = Math.max(0, ((p.hhSurv && yr >= p.hhSurv.yr) ? p.hhSurv.need : annualNetNeed) * idxY + hsCostDelta(p, currentAgeSim, idxY));          // spending target in this year's dollars
             let spouseAgeSim = p.calcMode === 'couple' ? (p.spouseAge + (currentAgeSim - p.currentAge)) : null;
             let rlifTransferThisYear = 0;
             let ul = { bB: 0, oB: 0, fB: 0, fO: 0, elig: 1 };
@@ -4112,9 +4155,20 @@ The numbers in that example are placeholders from a prior year — replace every
                 simRrsp += sv.rrsp * f; simRlifUnlocked += sv.rlif * f; simLira += sv.lira * f; simBell += sv.pool * f;
                 simNonReg += sv.non * f; nonRegACB += sv.acb * f; simFtq += sv.ftq * f; simTfsa += sv.tfsa * f;
             }
-            const opn = { rrsp: simRrsp, rlif: simRlifUnlocked, lira: simLira, bell: simBell, non: simNonReg, ftq: simFtq, tfsa: simTfsa };
             const tfsaLimitY = tfsaLimitAtAge(currentAgeSim);
             tfsaRoom += tfsaLimitY + lastTfsaDraw;
+            // Sale of the family home (principal residence: no tax). The net money is added to the TFSA (up to its room) and/or the non-registered account.
+            let hsNet = 0, hsTfsa = 0, hsNon = 0;
+            if (hsActive(p) && Math.round(currentAgeSim) === hsAgeEff(p)) {
+                hsNet = hsNetProceeds(p, idxY);
+                if (hsNet > 0) {
+                    hsTfsa = (p.homeSaleDest === 'nonreg') ? 0 : Math.min(hsNet, Math.max(0, tfsaRoom));
+                    hsNon = hsNet - hsTfsa;
+                    simTfsa += hsTfsa; tfsaRoom -= hsTfsa;
+                    simNonReg += hsNon; nonRegACB += hsNon;
+                }
+            }
+            const opn = { rrsp: simRrsp, rlif: simRlifUnlocked, lira: simLira, bell: simBell, non: simNonReg, ftq: simFtq, tfsa: simTfsa };
 
             // RREGOP only pays out once the spouse has actually reached her
             // own retirement age, and the ~15% QPP-coordination cut only
@@ -4617,7 +4671,7 @@ The numbers in that example are placeholders from a prior year — replace every
                 eventNames: eventNamesThisYear, eventDetails: eventDetailsThisYear
             });
             scheduleRows.push({
-                age: currentAgeSim, rate: yearRate,
+                age: currentAgeSim, rate: yearRate, homeSaleNet: hsNet, homeSaleTfsa: hsTfsa, homeSaleNon: hsNon,
                 rrspDraw, simRrsp, liraDraw, simLira, nonRegDraw, simNonReg,
                 ftqDraw, simFtq, tfsaDraw, simTfsa,
                 rlifTransferThisYear, rlifUnlockedDraw, simRlifUnlocked, oRrsp: opn.rrsp, oRlif: opn.rlif, oLira: opn.lira, oBell: opn.bell, oNon: opn.non, oFtq: opn.ftq, oTfsa: opn.tfsa, ulBellBefore: ul.bB, ulOtherBefore: ul.oB, ulFromBell: ul.fB, ulFromOther: ul.fO, ulOtherElig: ul.elig,
@@ -5447,6 +5501,7 @@ The numbers in that example are placeholders from a prior year — replace every
         return String(n);
     }
     function cardSummary(card) {
+        if (card.id === 'homeSaleCard') return typeof hsSummary === 'function' ? hsSummary() : '';
         if (card.id === 'otherIncCard') return typeof oiSummary === 'function' ? oiSummary() : '';
         const idm = card.id || '';
         const gq = card.querySelector('#qppMonthlyAmt, #spouseQppMonthlyAmt');
@@ -5812,7 +5867,7 @@ The numbers in that example are placeholders from a prior year — replace every
                     '<div class="yp-ulh">2) New unlocked RRSP / RRIF</div>' +
                     (has(r.ulFromBell) ? '<div class="yp-ul"><span>From Bell pension (DC)</span><b>' + fmtNum(r.ulFromBell) + '</b></div>' : '') +
                     (has(r.ulFromOther) ? '<div class="yp-ul"><span>From LIRA / LIF (other)</span><b>' + fmtNum(r.ulFromOther) + '</b></div>' : '') +
-                    '<div class="yp-ul tot"><span>New unlocked RRSP / RRIF</span><b>' + fmtNum(unlock) + '</b></div></div>') : '') + '<div class="yp-do"><h5>Do this</h5>' + acctHtml + '</div>' +
+                    '<div class="yp-ul tot"><span>New unlocked RRSP / RRIF</span><b>' + fmtNum(unlock) + '</b></div></div>') : '') + hsCardNote(r) + '<div class="yp-do"><h5>Do this</h5>' + acctHtml + '</div>' +
                 '<details class="yp-why"><summary>How each dollar is used: spending, taxes, moves</summary>' +
                 '<div class="yp-row sub"><span>for spending, tax and money moved' + (has(pens) ? ' (QPP, OAS and pension income of ' + fmtNum(pens) + ' comes in on top)' : '') + '</span></div>' +
                 stepH(1, 'Spending', living + evt) + s1 + '</div>' +
@@ -5856,9 +5911,71 @@ The numbers in that example are placeholders from a prior year — replace every
         const tfsaUsed = list.find(r => has(r.tfsaDraw));
         if (tfsaUsed) h += '<p class="ps-note">Your TFSA is used from age ' + tfsaUsed.age + '.</p>';
         else if (has(list[0].simTfsa)) h += '<p class="ps-note">Your TFSA is not used: it keeps growing tax-free and is left to your family.</p>';
+        h += hsCardNote(list.find(r => r.homeSaleNet > 0), true);
         h += '<p class="ps-note">QPP starts at age ' + PA + ' and OAS at age ' + OA + '.</p>';
         if (Math.min(PA, OA) > p.targetAge) h += '<p class="ps-note">Your withdrawals drop then, because these pensions pay part of your spending.</p>';
         return h + '</div>';
+    }
+
+    // ---- Optional sale of the family home during retirement (Step 1 question homeSaleDecl, Step 2 card homeSaleCard) ----
+    // Saved as homeSaleMode (no / downsize / rent), homeSaleAge, homeSalePrice, homeSaleCostPct, homeSaleOwing, homeSaleNewPrice, homeSaleBuyPct,
+    // homeSaleSaved, homeSaleNewCost, homeSaleDest (tfsa / nonreg). Prices are in today's dollars and rise with the inflation index.
+    function hsActive(p) { return !!p && (p.homeSaleMode === 'downsize' || p.homeSaleMode === 'rent'); }
+    function hsAgeEff(p) { return Math.max(Math.round(p.targetAge || 0), Math.round(parseFloat(p.homeSaleAge) || 0)); }
+    function hsNum(v) { return Math.max(0, parseFloat(v) || 0); }
+    function hsNetProceeds(p, idx) {   // net money to invest, in the sale year's dollars (never below 0)
+        const sell = hsNum(p.homeSalePrice) * idx * (1 - Math.min(100, hsNum(p.homeSaleCostPct)) / 100) - hsNum(p.homeSaleOwing);
+        const buy = p.homeSaleMode === 'downsize' ? hsNum(p.homeSaleNewPrice) * idx * (1 + Math.min(100, hsNum(p.homeSaleBuyPct)) / 100) : 0;
+        return Math.max(0, sell - buy);
+    }
+    function hsCostDelta(p, age, idx) {   // change in yearly spending from the sale year on (+ means you spend more)
+        if (!hsActive(p) || age < hsAgeEff(p)) return 0;
+        return (hsNum(p.homeSaleNewCost) - hsNum(p.homeSaleSaved)) * idx;
+    }
+    function hsMode() { const d = document.getElementById('homeSaleDecl'); return d ? d.value : 'no'; }
+    function hsProfile() {
+        const g = id => document.getElementById(id);
+        if (!g('homeSaleDecl')) return {};
+        return { homeSaleMode: hsMode(), homeSaleAge: hsNum(g('homeSaleAge').value), homeSalePrice: hsNum(g('homeSalePrice').value), homeSaleCostPct: hsNum(g('homeSaleCostPct').value),
+            homeSaleOwing: hsNum(g('homeSaleOwing').value), homeSaleNewPrice: hsNum(g('homeSaleNewPrice').value), homeSaleBuyPct: hsNum(g('homeSaleBuyPct').value),
+            homeSaleSaved: hsNum(g('homeSaleSaved').value), homeSaleNewCost: hsNum(g('homeSaleNewCost').value), homeSaleDest: g('homeSaleDest').value === 'nonreg' ? 'nonreg' : 'tfsa' };
+    }
+    function hsLoad(p) {   // called by populateFormRaw
+        const g = id => document.getElementById(id); if (!g('homeSaleDecl')) return;
+        p = p || {};
+        g('homeSaleDecl').value = (p.homeSaleMode === 'downsize' || p.homeSaleMode === 'rent') ? p.homeSaleMode : 'no';
+        const set = (id, key, dflt) => { g(id).value = (p[key] === undefined || p[key] === null) ? dflt : p[key]; };
+        set('homeSaleAge', 'homeSaleAge', 75); set('homeSalePrice', 'homeSalePrice', 700000); set('homeSaleCostPct', 'homeSaleCostPct', 5);
+        set('homeSaleOwing', 'homeSaleOwing', 0); set('homeSaleNewPrice', 'homeSaleNewPrice', 450000); set('homeSaleBuyPct', 'homeSaleBuyPct', 3);
+        set('homeSaleSaved', 'homeSaleSaved', 0); set('homeSaleNewCost', 'homeSaleNewCost', 0);
+        g('homeSaleDest').value = p.homeSaleDest === 'nonreg' ? 'nonreg' : 'tfsa';
+        hsUi();
+    }
+    function hsMoney(n) { return '$' + Math.round(n).toLocaleString('en-CA'); }
+    function hsSummary() {
+        const m = hsMode(); if (m === 'no') return '';
+        const p = hsProfile(); return 'Age ' + hsAgeEff(Object.assign({ targetAge: 0 }, p)) + ' · ' + hsMoney(hsNetProceeds(p, 1)) + ' to invest';
+    }
+    function hsUi(opened) {
+        const card = document.getElementById('homeSaleCard'); if (!card) return;
+        const m = hsMode();
+        card.style.display = m === 'no' ? 'none' : '';
+        if (m !== 'no' && opened === true && typeof setCardCollapsed === 'function') setCardCollapsed(card, false);
+        document.getElementById('hsDownRows').style.display = m === 'downsize' ? '' : 'none';
+        const pv = document.getElementById('hsPreview');
+        if (m !== 'no') {
+            const p = hsProfile(), net = hsNetProceeds(p, 1), d = hsNum(p.homeSaleNewCost) - hsNum(p.homeSaleSaved);
+            pv.innerHTML = '<span>Left to invest after the sale (today\'s dollars):</span> <b>' + hsMoney(net) + '</b><br><span>Change in your yearly spending (today\'s dollars):</span> <b>' + (d < 0 ? '−' : '+') + hsMoney(Math.abs(d)) + '</b>';
+        } else pv.innerHTML = '';
+        if (typeof refreshCollapsibleSummaries === 'function') refreshCollapsibleSummaries();
+        if (window.QCRP_I18N && QCRP_I18N.refresh) QCRP_I18N.refresh();
+    }
+    function hsCardNote(r, summary) {
+        if (!r || !(r.homeSaleNet > 0)) return '';
+        const body = '<span>Home sale at age ' + r.age + ':</span> <b>' + fmtNum(r.homeSaleNet) + '</b> <span>is invested.</span>' +
+            (r.homeSaleTfsa > 0 ? ' <span>TFSA</span> <b>' + fmtNum(r.homeSaleTfsa) + '</b>' : '') +
+            (r.homeSaleNon > 0 ? ' <span>Non-registered</span> <b>' + fmtNum(r.homeSaleNon) + '</b>' : '');
+        return summary ? '<p class="ps-note">' + body + '</p>' : '<div class="ps-note" style="margin:6px 0">' + body + '</div>';
     }
 
     // "Judge the plan by": the on-track badge follows this one run (default) or the share of the 300 Monte Carlo markets that fund the plan.
@@ -6004,7 +6121,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const s = hhClone(me) || {}; delete s.hhSpouse; delete s.id; s.name = '';
         ['currentRrsp', 'contribRrsp', 'currentTfsa', 'contribTfsa', 'liraBalance', 'contribLira', 'fedDcBalance', 'contribFedDc', 'ftqBalance', 'contribFtq', 'currentNonReg', 'contribNonReg', 'ownPensionAnnual', 'extraRegAmt', 'tfsaRoomNow']
             .forEach(k => { if (k in s) s[k] = 0; });
-        s.otherIncOn = false; s.otherIncAmt = 0; s.otherIncListOn = false; s.otherIncList = {}; s.events = []; s.recurringEvents = []; s.rlifUnlockEnabled = false; s.livesAlone = 'no'; s.calcMode = 'couple'; s.alreadyRetired = false;
+        s.homeSaleMode = 'no'; s.otherIncOn = false; s.otherIncAmt = 0; s.otherIncListOn = false; s.otherIncList = {}; s.events = []; s.recurringEvents = []; s.rlifUnlockEnabled = false; s.livesAlone = 'no'; s.calcMode = 'couple'; s.alreadyRetired = false;
         return s;
     }
     function hhFromLegacy(p) {   // plans saved before household mode kept the spouse in a few fields on the same form
