@@ -107,6 +107,14 @@ with sync_playwright() as pw:
         check(wd['bars'] >= 5 and wd['rects'] >= wd['bars'] and wd['legend'] >= 1, 'withdraw chart: expected bars, segments and a legend, got %s' % wd)
         check(wd['first'].startswith('$') or wd['first'] == '–', 'withdraw chart: the first bar has no total label (%s)' % wd['first'])
 
+    # 6c. results headline colour: green when the money lasts, red when it runs out
+    hcol = pg.evaluate("(() => { const h = document.querySelector('.hero h2.hero-h'); return h ? [h.className, getComputedStyle(h).color] : null; })()")
+    check(hcol is not None, 'headline colour: hero headline has no hero-h class')
+    if hcol:
+        want = {'ok': 'rgb(21, 128, 61)', 'risk': 'rgb(180, 83, 9)', 'short': 'rgb(185, 28, 28)'}
+        lvl = [k for k in want if k in hcol[0].split()]
+        check(len(lvl) == 1 and hcol[1] == want[lvl[0]], 'headline colour: class %s gives %s' % (hcol[0], hcol[1]))
+
     # 7. text size
     pg.evaluate("cycleTextSize()")
     check(pg.evaluate("document.body.style.zoom") == '1.15' and pg.evaluate("document.getElementById('tsLabel').textContent") == 'Large', 'text size: first tap should give Large')
