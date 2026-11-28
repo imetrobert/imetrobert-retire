@@ -30,6 +30,7 @@ jobs:
           python3 scripts/test_other_income.py
           python3 scripts/test_household.py
           python3 scripts/test_planning_tools.py
+          python3 scripts/test_mc_run.py
           python3 scripts/test_statements.py
       - name: Refresh the code map
         run: python3 scripts/code_map.py
