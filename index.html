@@ -431,7 +431,7 @@ EDIT SAFELY: change wording in the HTML only for labels; do not rename element i
             #onePagePrint .op-kv td { padding: 2px 0; border-bottom: 1px solid #e2e8f0; font-size: 10.5pt; } #onePagePrint .op-kv td:last-child { text-align: right; }
             #onePagePrint .op-grid th, #onePagePrint .op-grid td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 10pt; }
             #onePagePrint .op-grid th:first-child, #onePagePrint .op-grid td:first-child { text-align: left; }
-            #onePagePrint .plan-sum { border: 1px solid #cbd5e1; padding: 6px 10px; margin: 10px 0; } #onePagePrint .plan-sum h3 { display: none; }
+            #onePagePrint .plan-sum { border: 1px solid #cbd5e1; padding: 6px 10px; margin: 10px 0; } #onePagePrint .plan-sum h3 { display: none; } #onePagePrint .wd-scroll { overflow: visible; } #onePagePrint .wd-scroll svg { width: 100%; height: auto; }
             #onePagePrint .op-foot { margin-top: 14px; font-size: 8.5pt; color: #475569; border-top: 1px solid #cbd5e1; padding-top: 6px; }
         }
         @media print {
@@ -486,6 +486,8 @@ details.tipbox>div{padding:0 12px 12px;font-size:14px;color:#1e293b}
 .ps-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eef2f7;font-size:.9rem}
 .ps-row span{color:#475569;flex:0 0 auto}.ps-row b{text-align:right;color:#0f172a}
 .ps-note{margin:8px 0 0;font-size:.85rem;color:#475569}
+.wd-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}.wd-scroll svg{display:block;max-width:none}
+.wd-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 2px;font-size:.78rem;color:#334155}.wd-key{display:inline-flex;align-items:center;gap:5px}.wd-key i{width:11px;height:11px;border-radius:3px;display:inline-block}
 .acct-help{font-size:.84rem;color:#475569;margin:2px 0 10px;line-height:1.4}
 .preset-row{display:flex;gap:6px;margin:6px 0 6px}
 .preset-row button{flex:1;padding:10px 4px;font-size:.78rem;line-height:1.25}
@@ -5889,26 +5891,44 @@ The numbers in that example are placeholders from a prior year — replace every
         }).join('');
     }
 
+    // Bar chart for the results top: one stacked bar per year, one colour per account you withdraw from that year,
+    // the year's total above the bar. Wider than the screen on purpose: it scrolls sideways (bars keep a readable width).
+    const WD_COLORS = { rrsp: '#2563eb', rlif: '#60a5fa', lira: '#7c3aed', nonReg: '#f59e0b', ftq: '#ef4444', tfsa: '#16a34a' };
+    function withdrawChartSvg(list, ACCS) {
+        if (!list.length) return '';
+        const BW = 30, GAP = 5, padL = 6, padR = 6, padT = 24, padB = 22, H = 190;
+        const n = list.length, W = padL + padR + n * BW + (n - 1) * GAP;
+        const totals = list.map(r => ACCS.reduce((t, a) => t + Math.max(0, r[a[2]] || 0), 0));
+        const maxV = Math.max.apply(null, totals.concat([1]));
+        const plotH = H - padT - padB;
+        const used = ACCS.filter(a => list.some(r => Math.round(r[a[2]] || 0) > 0));
+        let bars = '';
+        list.forEach((r, i) => {
+            const x = padL + i * (BW + GAP);
+            let yBase = H - padB;
+            used.forEach(a => {
+                const v = Math.max(0, r[a[2]] || 0);
+                if (Math.round(v) <= 0) return;
+                const hh = Math.max(1, plotH * v / maxV);
+                yBase -= hh;
+                bars += '<rect x="' + x + '" y="' + yBase.toFixed(1) + '" width="' + BW + '" height="' + hh.toFixed(1) + '" fill="' + WD_COLORS[a[0]] + '"><title>' + a[1] + ': ' + fmtNum(v) + '</title></rect>';
+            });
+            bars += '<text class="wd-total" x="' + (x + BW / 2) + '" y="' + (yBase - 5).toFixed(1) + '" font-size="10" font-weight="700" fill="#1e293b" text-anchor="middle">' + (totals[i] > 0 ? fmtCompact(totals[i]) : '–') + '</text>' +
+                '<text x="' + (x + BW / 2) + '" y="' + (H - 7) + '" font-size="10" fill="#64748b" text-anchor="middle">' + r.age + '</text>';
+        });
+        const legend = used.map(a => '<span class="wd-key"><i style="background:' + WD_COLORS[a[0]] + '"></i><span>' + a[1] + '</span></span>').join('');
+        return '<div class="wd-chart"><div class="wd-scroll"><svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Withdrawals by account for each year of the plan, ages ' + list[0].age + ' to ' + list[n - 1].age + '">' +
+            '<line x1="0" y1="' + (H - padB) + '" x2="' + W + '" y2="' + (H - padB) + '" stroke="#cbd5e1"/>' + bars + '</svg></div>' +
+            '<div class="wd-legend">' + legend + '</div><div class="ps-note">Each bar is one year (the age is under it): what you take out, by account. The amount above each bar is the total for that year. Swipe sideways to see every year.</div></div>';
+    }
+
     // Plain-words summary of the plan at the top of the results (accounts used by age range, TFSA, government pensions).
     function planSummaryHtml(rows, p, PA, OA, shortAge) {
         const ACCS = [['rrsp', 'RRSP / RRIF', 'rrspDraw'], ['rlif', 'Unlocked RRSP / RRIF', 'rlifUnlockedDraw'], ['lira', 'Locked-in (Bell pension + LIRA)', 'liraDraw'], ['nonReg', 'Non-registered savings', 'nonRegDraw'], ['ftq', 'FTQ fund', 'ftqDraw'], ['tfsa', 'TFSA', 'tfsaDraw']];
         const has = v => Math.round(v || 0) !== 0;
         const list = rows.filter(r => r.age <= p.lifeExpectancy && (!shortAge || r.age < shortAge));
         if (!list.length) return '';
-        const segs = [];
-        list.forEach(r => {
-            const tot = ACCS.reduce((t, a) => t + Math.max(0, r[a[2]] || 0), 0);
-            const names = tot > 0 ? ACCS.filter(a => (r[a[2]] || 0) > tot * 0.1).map(a => a[1]) : [];
-            const key = names.join(' + ');
-            const last = segs[segs.length - 1];
-            if (last && last.key === key) last.to = r.age; else segs.push({ key: key, from: r.age, to: r.age });
-        });
-        const shown = segs.slice(0, 5);
-        let h = '<div class="plan-sum"><h3>Your plan in a few lines</h3>';
-        shown.forEach(sg => {
-            h += '<div class="ps-row"><span>' + (sg.from === sg.to ? 'Age ' + sg.from : 'Ages ' + sg.from + '–' + sg.to) + '</span><b>' + (sg.key || 'No withdrawal needed') + '</b></div>';
-        });
-        if (segs.length > shown.length) h += '<div class="ps-note">The mix of accounts changes a few more times; open the year cards below.</div>';
+        let h = '<div class="plan-sum"><h3>Your plan in a few lines</h3>' + withdrawChartSvg(list, ACCS);
         const tfsaUsed = list.find(r => has(r.tfsaDraw));
         if (tfsaUsed) h += '<p class="ps-note">Your TFSA is used from age ' + tfsaUsed.age + '.</p>';
         else if (has(list[0].simTfsa)) h += '<p class="ps-note">Your TFSA is not used: it keeps growing tax-free and is left to your family.</p>';
