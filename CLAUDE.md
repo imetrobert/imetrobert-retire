@@ -22,7 +22,7 @@ If something breaks (red check, wrong result, no access): `docs/if-something-bre
 
 ## Two files, two jobs
 - `index.html` = the planner (forms, tax, results). Almost every minor feature goes here.
-- `account.js` = sign-in gate, "Welcome <email>" banner, the rows it adds to the planner menu `#toolMenu` (Logged in as, My plans, Documentation, Sign out), saved plans. Touch it only for those.
+- `account.js` = sign-in gate, "Welcome <email>" banner, the rows it adds to the planner menu `#toolMenu` (Logged in as, Documentation, Sign out), encrypted cloud copies. Saving is local first: results page has one "Save scenario" button, the menu has one "Load scenario" row, and the cloud copy is an optional checkbox on the Load scenario page (recipe "Save and load (3 principles)" in `docs/common-edits.md`; `account.js` must stay identical in all three planners). Touch it only for those.
   Its documentation link is `CFG.docs` (blank for now = link hidden; set it if a guide is added). App id `retire-personal`; the Quebec and Ontario planners have their own copies.
 - `statements.js` (+ `vendor/pdfjs/`) = reads a government statement PDF on the device and fills QPP fields after Preview/Apply (recipe 11 in docs/common-edits.md). No network calls. Test: `python3 scripts/test_statements.py`. Only FAKE sample PDFs in `tests/fixtures/` (this repo is public; never a real statement).
 - Household mode: spouse fills in their own full form, results merge (common-edits recipe on household mode). Test: `python3 scripts/test_household.py`.
