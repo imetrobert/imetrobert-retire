@@ -5896,9 +5896,16 @@ The numbers in that example are placeholders from a prior year — replace every
     // Bar chart for the results top: one stacked bar per year, one colour per account you withdraw from that year,
     // the year's total above the bar. Wider than the screen on purpose: it scrolls sideways (bars keep a readable width).
     const WD_COLORS = { rrsp: '#2563eb', rlif: '#60a5fa', lira: '#7c3aed', nonReg: '#f59e0b', ftq: '#ef4444', tfsa: '#16a34a' };
-    function withdrawChartSvg(list, ACCS) {
+    function withdrawChartSvg(list, ACCS, PA, OA, pn) {
         if (!list.length) return '';
-        const BW = 30, GAP = 5, padL = 6, padR = 6, padT = 24, padB = 22, H = 190;
+        // Solid lines where the government pensions start (they pay part of the spending, so withdrawals drop after them)
+        const startLine = (age) => { const i = list.findIndex(r => r.age === Math.round(age)); return i > 0 ? i : -1; };
+        const iQ = startLine(PA), iO = startLine(OA);
+        const marks = [];
+        if (iQ > 0 && iQ === iO) marks.push({ i: iQ, label: pn + ' + OAS start' });
+        else { if (iQ > 0) marks.push({ i: iQ, label: pn + ' starts' }); if (iO > 0) marks.push({ i: iO, label: 'OAS starts' }); }
+        marks.sort((m1, m2) => m1.i - m2.i);
+        const BW = 30, GAP = 5, padL = 6, padR = 6, padT = marks.length ? 44 : 24, padB = 22, H = 190;
         const n = list.length, W = padL + padR + n * BW + (n - 1) * GAP;
         const totals = list.map(r => ACCS.reduce((t, a) => t + Math.max(0, r[a[2]] || 0), 0));
         const maxV = Math.max.apply(null, totals.concat([1]));
@@ -5918,10 +5925,16 @@ The numbers in that example are placeholders from a prior year — replace every
             bars += '<text class="wd-total" x="' + (x + BW / 2) + '" y="' + (yBase - 5).toFixed(1) + '" font-size="10" font-weight="700" fill="#1e293b" text-anchor="middle">' + (totals[i] > 0 ? fmtCompact(totals[i]) : '–') + '</text>' +
                 '<text x="' + (x + BW / 2) + '" y="' + (H - 7) + '" font-size="10" fill="#64748b" text-anchor="middle">' + r.age + '</text>';
         });
+        marks.forEach((m, k) => {
+            const lx = padL + m.i * (BW + GAP) - GAP / 2;
+            const near = lx > W - 110;
+            bars += '<line x1="' + lx + '" y1="' + (k % 2 ? 30 : 16) + '" x2="' + lx + '" y2="' + (H - padB) + '" stroke="#0f172a" stroke-width="2"/>' +
+                '<text x="' + (near ? lx - 4 : lx + 4) + '" y="' + (k % 2 ? 38 : 24) + '" font-size="10" font-weight="700" fill="#0f172a" text-anchor="' + (near ? 'end' : 'start') + '">' + m.label + '</text>';
+        });
         const legend = used.map(a => '<span class="wd-key"><i style="background:' + WD_COLORS[a[0]] + '"></i><span>' + a[1] + '</span></span>').join('');
         return '<div class="wd-chart"><div class="wd-scroll"><svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Withdrawals by account for each year of the plan, ages ' + list[0].age + ' to ' + list[n - 1].age + '">' +
             '<line x1="0" y1="' + (H - padB) + '" x2="' + W + '" y2="' + (H - padB) + '" stroke="#cbd5e1"/>' + bars + '</svg></div>' +
-            '<div class="wd-legend">' + legend + '</div><div class="ps-note">Each bar is one year (the age is under it): what you take out, by account. The amount above each bar is the total for that year. Swipe sideways to see every year.</div></div>';
+            '<div class="wd-legend">' + legend + '</div><div class="ps-note">Each bar is one year (the age is under it): what you take out, by account. The amount above each bar is the total for that year. Swipe sideways to see every year.</div>' + (marks.length ? '<div class="ps-note">The solid lines show when QPP and OAS start: after that, these pensions pay part of your spending, so your accounts pay less.</div>' : '') + '</div>';
     }
 
     // Plain-words summary of the plan at the top of the results (accounts used by age range, TFSA, government pensions).
@@ -5930,7 +5943,7 @@ The numbers in that example are placeholders from a prior year — replace every
         const has = v => Math.round(v || 0) !== 0;
         const list = rows.filter(r => r.age <= p.lifeExpectancy && (!shortAge || r.age < shortAge));
         if (!list.length) return '';
-        let h = '<div class="plan-sum"><h3>Your plan in a few lines</h3>' + withdrawChartSvg(list, ACCS);
+        let h = '<div class="plan-sum"><h3>Your plan in a few lines</h3>' + withdrawChartSvg(list, ACCS, PA, OA, 'QPP');
         const tfsaUsed = list.find(r => has(r.tfsaDraw));
         if (tfsaUsed) h += '<p class="ps-note">Your TFSA is used from age ' + tfsaUsed.age + '.</p>';
         else if (has(list[0].simTfsa)) h += '<p class="ps-note">Your TFSA is not used: it keeps growing tax-free and is left to your family.</p>';
